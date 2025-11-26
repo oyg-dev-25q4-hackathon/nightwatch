@@ -84,11 +84,109 @@ class TestController:
                     }
                 }), 200
             else:
+            return jsonify({
+                'success': False,
+                'error': 'Test not found'
+            }), 404
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+        finally:
+            db.close()
+    
+    def create_dummy_test(self):
+        """테스트용 더미 PR 생성"""
+        from datetime import datetime
+        import random
+        
+        data = request.json
+        subscription_id = data.get('subscription_id')
+        pr_number = data.get('pr_number', random.randint(100, 999))
+        status = data.get('status', 'completed')  # pending, running, completed, failed
+        
+        if not subscription_id:
+            return jsonify({
+                'success': False,
+                'error': 'subscription_id is required'
+            }), 400
+        
+        db = next(get_db())
+        try:
+            # 구독 정보 확인
+            subscription = db.query(Subscription).filter(
+                Subscription.id == subscription_id
+            ).first()
+            
+            if not subscription:
                 return jsonify({
                     'success': False,
-                    'error': 'Test not found'
+                    'error': 'Subscription not found'
                 }), 404
+            
+            # 더미 테스트 결과 생성
+            dummy_results = [
+                {
+                    'description': '메인 페이지 로드 테스트',
+                    'actions': [
+                        {'type': 'goto', 'url': f'https://pr-{pr_number}.{subscription.repo_full_name.split("/")[1]}.com'},
+                        {'type': 'wait', 'seconds': 2},
+                        {'type': 'screenshot', 'name': 'main_page'}
+                    ],
+                    'success': True,
+                    'error': None
+                },
+                {
+                    'description': '로그인 버튼 클릭 테스트',
+                    'actions': [
+                        {'type': 'click', 'selector': 'button.login'},
+                        {'type': 'wait', 'seconds': 1},
+                        {'type': 'screenshot', 'name': 'login_modal'}
+                    ],
+                    'success': True,
+                    'error': None
+                },
+                {
+                    'description': '검색 기능 테스트',
+                    'actions': [
+                        {'type': 'fill', 'selector': 'input.search', 'value': 'test query'},
+                        {'type': 'click', 'selector': 'button.search-submit'},
+                        {'type': 'wait', 'seconds': 2},
+                        {'type': 'screenshot', 'name': 'search_results'}
+                    ],
+                    'success': status != 'failed',
+                    'error': 'Failed to find search results' if status == 'failed' else None
+                }
+            ]
+            
+            # 테스트 레코드 생성
+            test = Test(
+                subscription_id=subscription_id,
+                pr_number=pr_number,
+                pr_url=f'https://github.com/{subscription.repo_full_name}/pull/{pr_number}',
+                repo_full_name=subscription.repo_full_name,
+                status=status,
+                test_results=dummy_results,
+                created_at=datetime.utcnow(),
+                completed_at=datetime.utcnow() if status in ['completed', 'failed'] else None
+            )
+            
+            db.add(test)
+            db.commit()
+            
+            return jsonify({
+                'success': True,
+                'test': {
+                    'id': test.id,
+                    'pr_number': test.pr_number,
+                    'status': test.status,
+                    'created_at': test.created_at.isoformat()
+                }
+            }), 201
+            
         except Exception as e:
+            db.rollback()
             return jsonify({
                 'success': False,
                 'error': str(e)

@@ -50,3 +50,7 @@ def get_tests():
 def get_test(test_id):
     return test_controller.get_test(test_id)
 
+@api_bp.route('/tests/dummy', methods=['POST'])
+def create_dummy_test():
+    return test_controller.create_dummy_test()
+
