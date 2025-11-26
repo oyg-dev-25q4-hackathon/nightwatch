@@ -6,6 +6,7 @@ MCP 서버를 통해 브라우저 자동화를 수행
 import base64
 import time
 import os
+from urllib.parse import urlparse
 from .browser_mcp_client import BrowserMCPClient
 from playwright.sync_api import sync_playwright
 
@@ -100,43 +101,21 @@ class BrowserExecutor:
                 # PR URL이 있으면 goto 액션의 URL을 대체
                 if action['type'] == 'goto' and pr_url:
                     original_url = action['url']
-                    # 상대 경로인 경우 PR URL과 결합
+                    target = pr_url if pr_url.startswith(('http://', 'https://')) else f"http://{pr_url}"
+                    parsed_target = urlparse(target)
+                    base_scheme = parsed_target.scheme or 'http'
+                    base_netloc = parsed_target.netloc
+                    base_root = f"{base_scheme}://{base_netloc}"
+                    
                     if original_url.startswith('/'):
-                        action['url'] = f"https://{pr_url}{original_url}"
-                    elif not original_url.startswith('http'):
-                        action['url'] = f"https://{pr_url}/{original_url}"
+                        action['url'] = f"{base_root}{original_url}"
+                    elif original_url.startswith(('http://', 'https://')):
+                        action['url'] = original_url
+                    elif '://' not in original_url and ('.' in original_url or ':' in original_url):
+                        scheme = 'http' if original_url.startswith(('localhost', '127.')) else base_scheme
+                        action['url'] = f"{scheme}://{original_url.lstrip('/')}"
                     else:
-                        # 전체 URL인 경우
-                        # 이미 pr_url이 포함되어 있으면 교체하지 않음 (중복 방지)
-                        if pr_url in original_url:
-                            action['url'] = original_url
-                        else:
-                            # example.com 또는 base_url을 pr_url로 교체
-                            if 'example.com' in original_url:
-                                action['url'] = original_url.replace('example.com', pr_url)
-                            elif self.base_url in original_url:
-                                # base_url을 pr_url로 교체 (도메인 부분만)
-                                # https://pr-1.global.oliveyoung.com -> https://pr-1.global.oliveyoung.com (이미 PR URL)
-                                # https://global.oliveyoung.com -> https://pr-1.global.oliveyoung.com
-                                url_parts = original_url.split('://')
-                                if len(url_parts) == 2:
-                                    protocol = url_parts[0]
-                                    domain_path = url_parts[1]
-                                    # 도메인 부분만 교체
-                                    if domain_path.startswith(self.base_url):
-                                        # global.oliveyoung.com/path -> pr-1.global.oliveyoung.com/path
-                                        action['url'] = f"{protocol}://{pr_url}{domain_path[len(self.base_url):]}"
-                                    elif f'.{self.base_url}' in domain_path:
-                                        # subdomain.global.oliveyoung.com -> subdomain.pr-1.global.oliveyoung.com (이건 이상하지만)
-                                        action['url'] = original_url.replace(f'.{self.base_url}', f'.{pr_url}')
-                                    else:
-                                        # base_url이 중간에 있는 경우
-                                        action['url'] = original_url.replace(self.base_url, pr_url)
-                                else:
-                                    action['url'] = original_url.replace(self.base_url, pr_url)
-                            else:
-                                # 다른 도메인인 경우 그대로 사용
-                                action['url'] = original_url
+                        action['url'] = f"{base_root}/{original_url.lstrip('/')}"
                 
                 action_result = self._execute_action(action)
                 result['actions_executed'].append(action_result)

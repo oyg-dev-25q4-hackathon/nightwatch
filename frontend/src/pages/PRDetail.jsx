@@ -219,7 +219,11 @@ function PRDetail() {
   };
 
   const handleRegenerateScenarios = async () => {
-    if (!confirm("시나리오를 다시 생성하시겠습니까?\n\n기존 테스트 결과는 유지되고, 새로운 시나리오가 생성됩니다.")) {
+    if (
+      !confirm(
+        "시나리오를 다시 생성하고 즉시 테스트를 재실행할까요?\n\n기존 결과는 새 실행 결과로 대체됩니다."
+      )
+    ) {
       return;
     }
 
@@ -231,7 +235,12 @@ function PRDetail() {
       );
 
       if (response.data.success) {
-        alert(`✅ ${response.data.message || `${response.data.scenarios_count}개의 시나리오가 생성되었습니다!`}`);
+        alert(
+          `✅ ${
+            response.data.message ||
+            `${response.data.scenarios_count}개의 시나리오가 실행되었습니다!`
+          }`
+        );
         // 테스트 정보 새로고침
         fetchTestDetail();
       } else {

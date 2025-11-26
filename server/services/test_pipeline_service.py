@@ -185,3 +185,34 @@ class TestPipelineService:
         finally:
             executor.close()
 
+    def run_existing_scenarios(self, scenarios, pr_url=None):
+        """
+        이미 생성된 시나리오 목록을 순차적으로 실행
+        """
+        from ..config import VIDEOS_DIR
+        import os
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        os.makedirs(VIDEOS_DIR, exist_ok=True)
+        
+        executor = BrowserExecutor(
+            video_dir=os.path.join(VIDEOS_DIR, f"regenerated_{timestamp}"),
+            use_mcp=True,
+            base_url=self.base_url
+        )
+        results = []
+        validator = VisionValidator()
+        
+        try:
+            for scenario in scenarios:
+                result = executor.execute_scenario(scenario, pr_url=pr_url)
+                if result['success'] and result.get('screenshot'):
+                    validation = validator.validate_screenshot(
+                        result['screenshot'],
+                        scenario.get('expected_result', '')
+                    )
+                    result['validation'] = validation
+                results.append(result)
+            return results
+        finally:
+            executor.close()
+

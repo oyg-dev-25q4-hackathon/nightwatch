@@ -121,38 +121,73 @@ MCP_SERVER_URL=http://localhost:3000  # MCP 서버 URL (선택사항)
 
 ## 🚀 실행 방법
 
-### 1. 환경 설정
+### 1. 공통 사전 준비
 
 ```bash
-# 가상환경 생성
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+cd /Users/jiho/Desktop/projects/hackerton
 
-# 패키지 설치
+# 가상환경 생성 및 진입
+python3 -m venv venv
+source venv/bin/activate  # Windows는 venv\Scripts\activate
+
+# 서버 의존성 설치
 pip install -r requirements.txt
 
-# Playwright 브라우저 설치
+# Playwright 실행 브라우저 설치
 playwright install chromium
+
+# 프론트엔드 의존성 설치
+cd frontend && npm install && cd ..
 ```
 
-### 2. 서버 실행
+필수 환경 변수는 `.env`에 작성합니다.
+
+- `VERTEX_PROJECT_ID`, `VERTEX_LOCATION`, `GOOGLE_APPLICATION_CREDENTIALS`
+- `ENCRYPTION_KEY` (Fernet 키, `python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`로 생성)
+- `DEPLOYMENT_MODE=local` 인 경우 `BASE_URL`을 비워 두면 자동으로 `localhost:5173`을 사용합니다.
+- PAT 저장 시 `ENCRYPTION_KEY`가 올바른 base64 값인지 반드시 확인하세요.
+
+DB를 초기 상태로 만들고 싶다면 언제든 `python3 reset_db.py`를 실행하면 됩니다.
+
+### 2. 백엔드 (Flask API + Polling)
 
 ```bash
-python main.py
+cd /Users/jiho/Desktop/projects/hackerton
+source venv/bin/activate
+python main_with_polling.py
 ```
 
-### 3. ngrok으로 외부 노출 (로컬 테스트용)
+- API 서버(`localhost:5001`)와 GitHub Polling 스케줄러가 동시에 실행됩니다.
+- 서버 시작 시 Vertex/Slack/Encryption 설정 여부가 로그에 출력됩니다.
+- 시나리오 재생성 버튼을 누르면 새 시나리오를 만들고 즉시 테스트까지 자동 수행합니다.
+
+### 3. 프론트엔드 (Vite Dev Server)
 
 ```bash
-ngrok http 5000
+cd /Users/jiho/Desktop/projects/hackerton/frontend
+npm run dev -- --host --port 5173
 ```
 
-나온 URL을 GitHub Webhook에 등록:
+- 브라우저에서 `http://localhost:5173` 접속
+- 구독 추가 → PAT 연결 → 감지된 PR 클릭 → 상세 페이지에서 재테스트/시나리오 생성 기능 사용
 
-- Payload URL: `https://your-ngrok-url.ngrok.io/webhook`
-- Content type: `application/json`
-- Secret: `.env`의 `GITHUB_WEBHOOK_SECRET` 값
-- Events: `Pull requests`
+### 4. Browser MCP (선택)
+
+- `USE_BROWSER_MCP=true`일 경우 `MCP_SERVER_URL`에 맞춰 MCP 서버를 별도로 실행해야 합니다.
+- MCP 서버가 없으면 자동으로 Playwright(Fallback)로 실행되며, 이때도 `playwright install chromium`이 필요합니다.
+
+### 5. 로컬 PR 테스트 흐름
+
+1. 감지하려는 PR 브랜치를 로컬에서 `npm run dev`로 띄워 둡니다. (현재 로컬 모드는 `localhost:5173`을 바로 사용)
+2. 백엔드에서 PR을 감지하면 DB에 테스트가 생성되고, 프론트 상세 페이지에서 시나리오/결과를 확인할 수 있습니다.
+3. “시나리오 생성하기” 버튼을 누르면 새 시나리오를 만들고 곧바로 실행하며, 실행 결과는 `test_results`에 저장됩니다.
+4. 개별 시나리오 옆 “재테스트” 버튼으로 단일 시나리오를 다시 돌릴 수 있습니다.
+
+### 6. Slack 및 외부 연동 (선택)
+
+- Slack 토큰과 채널을 설정하면 테스트 결과를 Slack으로 전송합니다.
+- 외부 PR 프리뷰 도메인이 있는 경우 `subscription.base_url`에 `global.oliveyoung.com` 같은 값을 저장하면 `pr-{번호}.{base_url}` 형태로 접속합니다.
+- GitHub Webhook 대신 현재는 Polling 방식이 기본이며, 웹훅 모드를 사용하려면 `main.py`를 실행한 뒤 ngrok 등으로 노출하고 GitHub에 등록하면 됩니다.
 
 ## 🧪 테스트 방법
 

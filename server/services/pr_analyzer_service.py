@@ -95,14 +95,114 @@ PR 변경사항:
             return self._get_default_scenarios(pr_url)
     
     def _format_diff(self, pr_diff):
-        """PR diff를 읽기 쉬운 형식으로 변환"""
+        """PR diff를 읽기 쉬운 형식으로 변환 (구조화된 분석 포함)"""
         formatted = []
+        
+        # 전체 통계
+        total_files = len(pr_diff)
+        added_lines = 0
+        removed_lines = 0
+        file_types = {'frontend': [], 'backend': [], 'config': [], 'other': []}
+        
         for file in pr_diff:
-            formatted.append(f"\n파일: {file['filename']}")
-            formatted.append(f"상태: {file['status']}")
-            if file.get('patch'):
-                formatted.append(f"변경사항:\n{file['patch']}")
-        return '\n'.join(formatted)
+            filename = file['filename']
+            status = file['status']
+            patch = file.get('patch', '')
+            
+            # 파일 타입 분류
+            if any(ext in filename for ext in ['.jsx', '.tsx', '.js', '.ts', '.css', '.html', '.vue']):
+                file_type = 'frontend'
+            elif any(ext in filename for ext in ['.py', '.java', '.go', '.rs', '.cpp', '.c']):
+                file_type = 'backend'
+            elif any(ext in filename for ext in ['.json', '.yaml', '.yml', '.toml', '.ini', '.env']):
+                file_type = 'config'
+            else:
+                file_type = 'other'
+            
+            file_types[file_type].append(filename)
+            
+            # 변경된 라인 수 계산
+            if patch:
+                added = patch.count('\n+') - patch.count('\n+++')
+                removed = patch.count('\n-') - patch.count('\n---')
+                added_lines += max(0, added)
+                removed_lines += max(0, removed)
+            
+            # 파일 정보 추가
+            formatted.append(f"\n{'='*60}")
+            formatted.append(f"📄 파일: {filename}")
+            formatted.append(f"📊 상태: {status}")
+            formatted.append(f"🏷️  타입: {file_type}")
+            
+            if patch:
+                # 주요 변경사항 추출 (함수/컴포넌트 이름 등)
+                lines = patch.split('\n')
+                changed_functions = []
+                for line in lines:
+                    if line.startswith('+') and ('function' in line or 'def ' in line or 'const ' in line or 'class ' in line):
+                        # 함수/컴포넌트 이름 추출 시도
+                        if 'function' in line:
+                            parts = line.split('function')
+                            if len(parts) > 1:
+                                func_name = parts[1].split('(')[0].strip()
+                                if func_name:
+                                    changed_functions.append(f"추가된 함수: {func_name}")
+                        elif 'def ' in line:
+                            func_name = line.split('def ')[1].split('(')[0].strip()
+                            if func_name:
+                                changed_functions.append(f"추가된 함수: {func_name}")
+                        elif 'const ' in line and '=' in line:
+                            var_name = line.split('const ')[1].split('=')[0].strip()
+                            if var_name:
+                                changed_functions.append(f"추가된 상수: {var_name}")
+                        elif 'class ' in line:
+                            class_name = line.split('class ')[1].split('(')[0].split('{')[0].strip()
+                            if class_name:
+                                changed_functions.append(f"추가된 클래스: {class_name}")
+                
+                if changed_functions:
+                    formatted.append(f"🔧 주요 변경사항:")
+                    for func in changed_functions[:5]:  # 최대 5개만
+                        formatted.append(f"   - {func}")
+                
+                # 변경된 라인 수
+                if added > 0 or removed > 0:
+                    formatted.append(f"📈 변경 라인: +{added} / -{removed}")
+                
+                # 실제 diff 내용 (너무 길면 일부만)
+                if len(patch) > 2000:
+                    formatted.append(f"📝 변경사항 (일부):\n{patch[:2000]}...\n(전체 내용은 너무 깁니다)")
+                else:
+                    formatted.append(f"📝 변경사항:\n{patch}")
+            else:
+                formatted.append("📝 변경사항: (diff 정보 없음)")
+        
+        # 요약 정보 추가
+        summary = [
+            f"\n{'='*60}",
+            "📊 PR 변경사항 요약",
+            f"{'='*60}",
+            f"총 파일 수: {total_files}",
+            f"추가된 라인: +{added_lines}",
+            f"삭제된 라인: -{removed_lines}",
+            f"\n파일 타입별 분류:",
+            f"  - 프론트엔드: {len(file_types['frontend'])}개",
+            f"  - 백엔드: {len(file_types['backend'])}개",
+            f"  - 설정 파일: {len(file_types['config'])}개",
+            f"  - 기타: {len(file_types['other'])}개",
+        ]
+        
+        if file_types['frontend']:
+            summary.append(f"\n프론트엔드 파일:")
+            for f in file_types['frontend'][:5]:
+                summary.append(f"  - {f}")
+        
+        if file_types['backend']:
+            summary.append(f"\n백엔드 파일:")
+            for f in file_types['backend'][:5]:
+                summary.append(f"  - {f}")
+        
+        return '\n'.join(summary + formatted)
     
     def _get_default_scenarios(self, pr_url=None):
         """기본 테스트 시나리오"""

@@ -7,6 +7,7 @@ from ..models import Test, Subscription, get_db
 from ..services.test_pipeline_service import TestPipelineService
 from ..services.pat_auth_service import PATAuthService
 from github import Github
+from datetime import datetime
 import os
 
 class TestController:
@@ -314,13 +315,40 @@ class TestController:
             pr_diff = pipeline_service.get_pr_diff(pr)
             
             # PR 배포 URL 생성
+            pr_url = None
+            base_url = subscription.base_url
+            deployment_mode = os.getenv('DEPLOYMENT_MODE', 'skip')
+            
             if subscription.base_url:
-                base_url = subscription.base_url
-                pr_url = f"pr-{test.pr_number}.{base_url}"
+                # 구독에 base_url이 있으면 PR URL 자동 생성
+                base_url_clean = subscription.base_url.replace('https://', '').replace('http://', '').strip('/')
+                if ':' in base_url_clean:
+                    base_url_clean = base_url_clean.split(':')[0]
+                pr_url = f"pr-{test.pr_number}.{base_url_clean}"
+                print(f"🌐 Using base URL from subscription: {pr_url}")
+            elif deployment_mode == 'local':
+                # 로컬 배포 모드: PR 브랜치를 체크아웃하고 별도 포트로 실행
+                from ..services.local_deployer import LocalDeployer
+                try:
+                    local_deployer = LocalDeployer()
+                    deployment_info = local_deployer.deploy_pr(
+                        pr_number=test.pr_number,
+                        repo_name=test.repo_full_name,
+                        branch_name=test.branch_name,
+                        repo_url=None  # GitHub에서 자동 생성
+                    )
+                    pr_url = deployment_info['url']  # 예: localhost:8001
+                    print(f"🚀 PR #{test.pr_number} deployed locally at {pr_url}")
+                except Exception as deploy_err:
+                    print(f"⚠️ Local deployment failed: {deploy_err}")
+                    print(f"   Falling back to localhost:5173")
+                    pr_url = "localhost:5173"
+                    base_url = None
             else:
-                # base_url이 없으면 로컬 모드로 실행 (localhost:5173 사용)
+                # 배포 모드가 skip이거나 base_url이 없으면 기존 localhost:5173 사용
                 pr_url = "localhost:5173"
                 base_url = None
+                print(f"🌐 Using default localhost:5173 (no deployment)")
             
             # 시나리오 재생성
             from ..services.pr_analyzer_service import PRAnalyzerService
@@ -340,17 +368,31 @@ class TestController:
                     'error': f'시나리오 생성 중 오류가 발생했습니다: {str(e)}'
                 }), 500
             
-            # test_results를 시나리오만 저장 (실행 결과 없음)
-            # 시나리오를 원본 형태로 저장
-            test.test_results = scenarios
-            test.status = 'pending'  # 시나리오만 생성되었으므로 pending 상태
+            # 새 시나리오 실행
+            test.status = 'running'
+            db.commit()
+            try:
+                execution_results = pipeline_service.run_existing_scenarios(
+                    scenarios,
+                    pr_url=pr_url
+                )
+            except Exception as exec_err:
+                test.status = 'failed'
+                db.commit()
+                raise exec_err
+            
+            # 실행 결과 저장
+            test.test_results = execution_results
+            all_success = all(result.get('success') for result in execution_results)
+            test.status = 'completed' if all_success else 'failed'
+            test.completed_at = datetime.utcnow()
             db.commit()
             
             return jsonify({
                 'success': True,
-                'message': f'{len(scenarios)}개의 시나리오가 생성되었습니다.',
-                'scenarios_count': len(scenarios),
-                'scenarios': scenarios
+                'message': f'{len(execution_results)}개의 시나리오 실행이 완료되었습니다.',
+                'scenarios_count': len(execution_results),
+                'test_results': execution_results
             }), 200
             
         except Exception as e:
