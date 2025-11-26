@@ -21,6 +21,7 @@ class Subscription(Base):
     slack_notify = Column(Boolean, default=True)
     exclude_branches = Column(JSON)  # 제외할 브랜치 목록 (기본값: ['main'])
     test_options = Column(JSON)
+    base_url = Column(String(511), nullable=True)  # 기본 배포 URL (예: global.oliveyoung.com) - PR URL은 pr-{번호}.{base_url} 형식으로 자동 생성
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

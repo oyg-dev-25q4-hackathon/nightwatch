@@ -36,17 +36,26 @@ class SubscriptionController:
         
         user_id = data.get('user_id', 'default')
         repo_full_name = data.get('repo_full_name')
-        pat = data.get('pat')  # Optional: Public 저장소는 PAT 불필요
+        pat = data.get('pat')  # 필수
         auto_test = data.get('auto_test', True)
         slack_notify = data.get('slack_notify', True)
         exclude_branches = data.get('exclude_branches')  # 제외할 브랜치 목록
         test_options = data.get('test_options', {})
+        base_url = data.get('base_url')  # 기본 배포 URL (예: global.oliveyoung.com) - PR URL은 pr-{번호}.{base_url} 형식으로 자동 생성
         
         if not repo_full_name:
             return jsonify({
                 'success': False,
                 'error': 'repo_full_name is required'
             }), 400
+        
+        if not pat or not pat.strip():
+            return jsonify({
+                'success': False,
+                'error': 'pat (Personal Access Token) is required'
+            }), 400
+        
+        # base_url은 선택사항 (비워두면 로컬 배포 사용)
         
         try:
             # 제외할 브랜치 목록 처리 (기본값: ['main'])
@@ -62,7 +71,8 @@ class SubscriptionController:
                 auto_test=auto_test,
                 slack_notify=slack_notify,
                 exclude_branches=exclude_branches_list,
-                test_options=test_options
+                test_options=test_options,
+                base_url=base_url
             )
             
             if result['success']:

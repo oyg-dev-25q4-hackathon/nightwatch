@@ -242,7 +242,9 @@ class PollingService:
             finally:
                 db.close()
             
-            result = self.test_pipeline.run_test_pipeline(pr, pr_diff, branch_name)
+            # 구독에 저장된 기본 URL 전달 (PR URL은 pr-{번호}.{base_url} 형식으로 자동 생성)
+            base_url = subscription.base_url
+            result = self.test_pipeline.run_test_pipeline(pr, pr_diff, branch_name, base_url=base_url)
             
             db = next(get_db())
             try:

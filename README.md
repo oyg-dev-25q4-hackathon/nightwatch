@@ -97,7 +97,8 @@ GITHUB_WEBHOOK_SECRET=your-webhook-secret
 BASE_URL=global.oliveyoung.com  # 기본 웹사이트 URL (변경 가능)
 
 # 쿠버네티스 설정
-K8S_NAMESPACE=default  # 쿠버네티스 네임스페이스
+SKIP_K8S_DEPLOYMENT=true  # K8s 배포 건너뛰기 (기본값: true, 프로덕션 URL 사용)
+K8S_NAMESPACE=default  # 쿠버네티스 네임스페이스 (SKIP_K8S_DEPLOYMENT=false일 때만 필요)
 DEPLOYMENT_PREFIX=pr-preview  # 배포 이름 접두사
 
 # Browser MCP 설정

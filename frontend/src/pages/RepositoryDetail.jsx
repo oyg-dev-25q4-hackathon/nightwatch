@@ -274,6 +274,22 @@ function RepositoryDetail() {
                       </p>
                     </div>
                   )}
+                  {subscription.base_url && (
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                      <p className="text-blue-100 text-xs mb-1">
+                        기본 배포 URL
+                      </p>
+                      <p className="text-white font-semibold">
+                        {subscription.base_url}
+                      </p>
+                      <p className="text-blue-100 text-xs mt-2">
+                        💡 PR URL 형식:{" "}
+                        <code className="bg-white/20 px-1 rounded">
+                          pr-{"{번호}"}.{subscription.base_url}
+                        </code>
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="mt-4">

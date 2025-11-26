@@ -22,8 +22,9 @@ function Home() {
   const [formData, setFormData] = useState({
     repo_full_name: "",
     pat: "",
+    base_url: "", // 기본 배포 URL (예: global.oliveyoung.com) - PR URL은 pr-{번호}.{base_url} 형식으로 자동 생성
     auto_test: true,
-    slack_notify: true,
+    slack_notify: false, // 기본값: 비활성화
     exclude_branches: "main", // 기본값: main만 제외
   });
 
@@ -139,78 +140,46 @@ function Home() {
         return;
       }
 
-      const hasPAT = formData.pat && formData.pat.trim() !== "";
+      // PAT 필수 체크
+      if (!formData.pat || formData.pat.trim() === "") {
+        alert(
+          "❌ Personal Access Token (PAT)는 필수입니다. PAT를 입력해주세요."
+        );
+        setLoading(false);
+        return;
+      }
 
-      // PAT가 제공된 경우에만 검증
-      if (hasPAT) {
-        // 1. PAT 검증
+      // 기본 배포 URL은 선택사항 (비워두면 로컬 배포 사용)
+
+      // 1. PAT 검증
+      try {
         const verifyResult = await verifyPAT(formData.pat);
         if (!verifyResult.success) {
-          alert(`PAT 검증 실패: ${verifyResult.error}`);
+          alert(`❌ PAT 검증 실패: ${verifyResult.error}`);
           setLoading(false);
           return;
         }
+      } catch (error) {
+        alert(`❌ PAT 검증 중 오류: ${error.message}`);
+        setLoading(false);
+        return;
+      }
 
-        // 2. 레포지토리 접근 확인
+      // 2. 레포지토리 접근 확인
+      try {
         const accessResult = await checkRepoAccess(
           formData.pat,
           normalizedRepoName
         );
         if (!accessResult.success) {
-          alert(`레포지토리 접근 불가: ${accessResult.error}`);
+          alert(`❌ 레포지토리 접근 불가: ${accessResult.error}`);
           setLoading(false);
           return;
         }
-      } else {
-        // PAT가 없는 경우: Public 저장소인지 확인
-        try {
-          console.log("Checking public repo:", normalizedRepoName);
-          const response = await axios.get(
-            `https://api.github.com/repos/${normalizedRepoName}`
-          );
-          if (response.data.private) {
-            alert(
-              "Private 저장소는 PAT가 필요합니다. Personal Access Token을 입력해주세요."
-            );
-            setLoading(false);
-            return;
-          }
-          console.log("Public repo confirmed:", response.data.full_name);
-          // Public 저장소이지만 PAT 사용을 권장
-          if (!hasPAT) {
-            const usePAT = confirm(
-              "✅ Public 저장소입니다!\n\n" +
-                "💡 PAT를 사용하면 rate limit이 60회/시간 → 5,000회/시간으로 증가합니다.\n\n" +
-                "PAT를 추가하시겠습니까? (취소해도 PAT 없이 구독 가능합니다)"
-            );
-            if (usePAT) {
-              setLoading(false);
-              // PAT 입력 필드로 포커스 이동
-              setTimeout(() => {
-                const patInput = document.querySelector(
-                  'input[type="password"]'
-                );
-                if (patInput) patInput.focus();
-              }, 100);
-              return;
-            }
-          }
-        } catch (error) {
-          console.error("Repo check error:", error);
-          if (error.response?.status === 404) {
-            alert(
-              `저장소를 찾을 수 없습니다.\n입력한 이름: ${formData.repo_full_name}\n정규화된 이름: ${normalizedRepoName}\n\n저장소 이름을 확인해주세요.`
-            );
-          } else if (error.response?.status === 403) {
-            alert(
-              "GitHub API rate limit에 도달했습니다. PAT를 추가하면 rate limit이 5,000회/시간으로 증가합니다."
-            );
-          } else {
-            alert(`저장소 확인 중 오류가 발생했습니다: ${error.message}`);
-          }
-          setLoading(false);
-          return;
-        }
+      } catch (error) {
+        alert(`❌ 레포지토리 접근 확인 중 오류: ${error.message}`);
+        setLoading(false);
+        return;
       }
 
       // 3. 구독 추가
@@ -225,31 +194,24 @@ function Home() {
       const response = await axios.post(`${API_BASE_URL}/api/subscriptions`, {
         user_id: userId,
         repo_full_name: normalizedRepoName, // 정규화된 레포지토리 이름 사용
-        pat: hasPAT ? formData.pat : null, // PAT가 없으면 null
+        pat: formData.pat, // PAT 필수
+        base_url: formData.base_url.trim() || null, // 기본 배포 URL (선택사항, 예: global.oliveyoung.com)
         auto_test: formData.auto_test,
         slack_notify: formData.slack_notify,
         exclude_branches: excludeBranches,
       });
 
       if (response.data.success) {
-        const hasPAT = response.data.has_pat !== false; // PAT가 제공되었는지 확인
-        if (hasPAT && formData.pat) {
-          alert(
-            "✅ 구독이 추가되었습니다!\n\n💡 PAT가 연결되어 rate limit이 5,000회/시간으로 설정되었습니다."
-          );
-        } else if (!formData.pat) {
-          alert(
-            "✅ 구독이 추가되었습니다!\n\n⚠️ PAT가 없어 rate limit이 60회/시간입니다.\n나중에 구독 상세 페이지에서 PAT를 추가할 수 있습니다."
-          );
-        } else {
-          alert("✅ 구독이 추가되었습니다!");
-        }
+        alert(
+          "✅ 구독이 추가되었습니다!\n\n💡 PAT가 연결되어 rate limit이 5,000회/시간으로 설정되었습니다."
+        );
         setShowAddModal(false);
         setFormData({
           repo_full_name: "",
           pat: "",
+          base_url: "",
           auto_test: true,
-          slack_notify: true,
+          slack_notify: false, // 기본값: 비활성화
           exclude_branches: "main",
         });
         fetchSubscriptions();
@@ -526,7 +488,7 @@ function Home() {
               <form onSubmit={handleAddSubscription} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    GitHub 레포지토리
+                    GitHub 레포지토리 <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -548,14 +510,13 @@ function Home() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Personal Access Token (PAT)
-                    <span className="text-gray-500 text-xs ml-2">
-                      (Public 저장소는 선택사항)
-                    </span>
+                    Personal Access Token (PAT){" "}
+                    <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="password"
-                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx (Public 저장소는 비워두세요)"
+                    required
+                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
                     value={formData.pat}
                     onChange={(e) =>
                       setFormData({ ...formData, pat: e.target.value })
@@ -563,16 +524,45 @@ function Home() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    <span className="font-semibold text-blue-600">
-                      💡 권장:
-                    </span>{" "}
-                    Public 저장소도 PAT를 사용하면 rate limit이 60회/시간 →
-                    5,000회/시간으로 증가합니다.
-                    <br />
-                    Private 저장소는 PAT가 필수입니다.
-                    <br />
                     GitHub → Settings → Developer settings → Personal access
-                    tokens
+                    tokens → Generate new token
+                    <br />
+                    필요한 권한:{" "}
+                    <code className="bg-gray-100 px-1 rounded">repo</code> (전체
+                    접근 권한)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    기본 배포 URL (선택사항)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="global.oliveyoung.com (비워두면 로컬 배포 사용)"
+                    value={formData.base_url}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        base_url: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    <span className="font-semibold text-blue-600">
+                      입력한 경우:
+                    </span>{" "}
+                    PR이 감지되면 자동으로{" "}
+                    <code className="bg-gray-100 px-1 rounded">
+                      pr-{"{번호}"}.{"{base_url}"}
+                    </code>{" "}
+                    형식으로 URL이 생성됩니다.
+                    <br />
+                    <span className="font-semibold text-purple-600">
+                      로컬 테스트:
+                    </span>{" "}
+                    이 필드를 비워두세요!
                   </p>
                 </div>
 

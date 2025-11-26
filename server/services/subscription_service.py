@@ -21,7 +21,8 @@ class SubscriptionService:
         auto_test: bool = True,
         slack_notify: bool = True,
         exclude_branches: List[str] = None,
-        test_options: Dict = None
+        test_options: Dict = None,
+        base_url: str = None
     ) -> Dict:
         """레포지토리 구독 생성"""
         credential_id = None
@@ -35,53 +36,42 @@ class SubscriptionService:
             }
         repo_full_name = normalized_repo  # 정규화된 이름 사용
         
-        # PAT가 제공된 경우: 검증 및 저장
-        if pat:
-            # 1. PAT 검증
-            verify_result = self.pat_auth.verify_pat(pat)
-            if not verify_result['valid']:
-                return {
-                    'success': False,
-                    'error': f"PAT verification failed: {verify_result.get('error')}"
-                }
-            
-            # 2. 레포지토리 접근 권한 확인
-            access_result = self.pat_auth.check_repo_access(pat, repo_full_name)
-            if not access_result['accessible']:
-                return {
-                    'success': False,
-                    'error': f"Repository access denied: {access_result.get('error')}"
-                }
-            
-            # 3. 인증 정보 저장
-            try:
-                credential_id = self.pat_auth.save_credential(
-                    user_id=user_id,
-                    pat=pat,
-                    github_username=verify_result['username'],
-                    token_scopes=None
-                )
-            except Exception as e:
-                return {
-                    'success': False,
-                    'error': f"Failed to save credential: {str(e)}"
-                }
-        else:
-            # PAT가 없는 경우: Public 저장소인지 확인
-            public_check = self.pat_auth.check_repo_public(repo_full_name)
-            if not public_check['exists']:
-                return {
-                    'success': False,
-                    'error': f"Repository not found: {public_check.get('error')}"
-                }
-            
-            if not public_check['is_public']:
-                return {
-                    'success': False,
-                    'error': 'Private repository requires PAT. Please provide a Personal Access Token.'
-                }
-            
-            print(f"  ℹ️ Public repository detected: {repo_full_name}")
+        # PAT 필수: 검증 및 저장
+        if not pat or not pat.strip():
+            return {
+                'success': False,
+                'error': 'PAT (Personal Access Token) is required'
+            }
+        
+        # 1. PAT 검증
+        verify_result = self.pat_auth.verify_pat(pat)
+        if not verify_result['valid']:
+            return {
+                'success': False,
+                'error': f"PAT verification failed: {verify_result.get('error')}"
+            }
+        
+        # 2. 레포지토리 접근 권한 확인
+        access_result = self.pat_auth.check_repo_access(pat, repo_full_name)
+        if not access_result['accessible']:
+            return {
+                'success': False,
+                'error': f"Repository access denied: {access_result.get('error')}"
+            }
+        
+        # 3. 인증 정보 저장
+        try:
+            credential_id = self.pat_auth.save_credential(
+                user_id=user_id,
+                pat=pat,
+                github_username=verify_result['username'],
+                token_scopes=None
+            )
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"Failed to save credential: {str(e)}"
+            }
         
         # 4. 구독 정보 저장
         db = next(get_db())
@@ -99,6 +89,9 @@ class SubscriptionService:
                 # 기본값: main만 제외
                 existing.exclude_branches = exclude_branches if exclude_branches is not None else ['main']
                 existing.test_options = test_options or {}
+                # 기본 URL 업데이트 (제공된 경우)
+                if base_url is not None:
+                    existing.base_url = base_url
                 # PAT가 제공된 경우 credential_id 업데이트 (없던 경우 추가, 있던 경우 교체)
                 if credential_id is not None:
                     existing.user_credential_id = credential_id
@@ -126,6 +119,7 @@ class SubscriptionService:
                     # 기본값: main만 제외
                     exclude_branches=exclude_branches if exclude_branches is not None else ['main'],
                     test_options=test_options or {},
+                    base_url=base_url,
                     is_active=True,
                     last_polled_at=datetime.utcnow()
                 )
@@ -308,6 +302,7 @@ class SubscriptionService:
             'slack_notify': subscription.slack_notify,
             'exclude_branches': subscription.exclude_branches,
             'test_options': subscription.test_options,
+            'base_url': subscription.base_url,
             'created_at': subscription.created_at.isoformat() if subscription.created_at else None,
             'last_polled_at': subscription.last_polled_at.isoformat() if subscription.last_polled_at else None
         }

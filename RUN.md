@@ -91,6 +91,16 @@ ENCRYPTION_KEY=your-encryption-key
 BASE_URL=global.oliveyoung.com
 API_PORT=5001
 POLLING_INTERVAL_MINUTES=5
+
+# 배포 모드 설정
+# - 'local': 로컬에서 PR 브랜치 체크아웃 후 실행 (PR 변경사항 반영됨, 권장)
+# - 'k8s': Kubernetes 배포 (구현 필요)
+# - 'skip': 배포 건너뛰기, 프로덕션 URL 사용 (PR 변경사항 반영 안됨)
+DEPLOYMENT_MODE=local
+
+# 로컬 배포 설정 (DEPLOYMENT_MODE=local일 때)
+PR_DEPLOYMENT_DIR=./pr_deployments  # PR 체크아웃 디렉토리
+PR_PORT_BASE=8000  # PR 포트 시작 번호 (PR #1 = 8001, PR #2 = 8002)
 ```
 
 ### 패키지 설치 확인
