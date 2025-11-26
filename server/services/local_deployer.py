@@ -162,25 +162,84 @@ class LocalDeployer:
             print(f"   🐍 Detected Python project")
             # 가상환경 생성 및 의존성 설치
             venv_dir = pr_dir / 'venv'
+            venv_created = False
             if not venv_dir.exists():
                 print(f"   📥 Creating virtual environment...")
                 subprocess.run([sys.executable, '-m', 'venv', str(venv_dir)], check=True)
+                venv_created = True
             
-            # 가상환경이 생성될 때까지 잠시 대기
+            # 가상환경이 생성될 때까지 대기 (생성된 경우 더 길게 대기)
             import time
-            time.sleep(1)
+            wait_time = 3 if venv_created else 1
+            time.sleep(wait_time)
             
             pip = venv_dir / 'bin' / 'pip' if os.name != 'nt' else venv_dir / 'Scripts' / 'pip.exe'
             python = venv_dir / 'bin' / 'python' if os.name != 'nt' else venv_dir / 'Scripts' / 'python.exe'
             
-            # pip가 존재하는지 확인
+            # pip가 존재하는지 확인 (최대 5초까지 재시도)
+            max_retries = 5
+            retry_count = 0
+            while not pip.exists() and retry_count < max_retries:
+                print(f"   ⏳ Waiting for virtual environment to be ready... ({retry_count + 1}/{max_retries})")
+                time.sleep(1)
+                retry_count += 1
+                # 경로 재확인
+                pip = venv_dir / 'bin' / 'pip' if os.name != 'nt' else venv_dir / 'Scripts' / 'pip.exe'
+            
+            # pip가 여전히 없으면 시스템 pip 사용
             if not pip.exists():
-                print(f"   ⚠️ Virtual environment not ready, using system pip...")
-                pip = sys.executable.replace('python', 'pip')
-                python = sys.executable
+                print(f"   ⚠️ Virtual environment pip not found, using system pip...")
+                # 시스템 pip 경로 찾기 (pip3 우선)
+                try:
+                    import shutil
+                    system_pip = shutil.which('pip3') or shutil.which('pip')
+                    if system_pip:
+                        pip = Path(system_pip)
+                        # python도 pip3에 맞게 조정
+                        python3 = shutil.which('python3') or sys.executable
+                        python = Path(python3) if python3 else sys.executable
+                        print(f"   ✅ Using system pip: {pip}")
+                    else:
+                        # 마지막 수단: python -m pip 사용
+                        pip = None  # None으로 설정하면 python -m pip 사용
+                        python = sys.executable
+                        print(f"   ✅ Will use 'python -m pip'")
+                except Exception as e:
+                    print(f"   ⚠️ Could not find system pip, will use 'python -m pip': {e}")
+                    pip = None
+                    python = sys.executable
             
             print(f"   📥 Installing dependencies...")
-            subprocess.run([str(pip), 'install', '-r', 'requirements.txt'], cwd=pr_dir, check=True)
+            try:
+                if pip is None:
+                    # python -m pip 사용 (python3 우선)
+                    python_cmd = str(python) if isinstance(python, Path) else python
+                    subprocess.run([python_cmd, '-m', 'pip', 'install', '-r', 'requirements.txt'], cwd=pr_dir, check=True)
+                else:
+                    # 절대 경로 사용
+                    pip_abs = str(pip.resolve()) if hasattr(pip, 'resolve') else str(pip.absolute())
+                    subprocess.run([pip_abs, 'install', '-r', 'requirements.txt'], cwd=pr_dir, check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"   ❌ Failed to install dependencies: {e}")
+                print(f"   📋 pip 경로: {pip}")
+                print(f"   📋 python 경로: {python}")
+                print(f"   📋 작업 디렉토리: {pr_dir}")
+                # pip3로 재시도
+                if pip and 'pip3' not in str(pip):
+                    print(f"   🔄 Retrying with pip3...")
+                    try:
+                        import shutil
+                        pip3_path = shutil.which('pip3')
+                        if pip3_path:
+                            subprocess.run([pip3_path, 'install', '-r', 'requirements.txt'], cwd=pr_dir, check=True)
+                            print(f"   ✅ Successfully installed with pip3")
+                        else:
+                            raise
+                    except Exception as e2:
+                        print(f"   ❌ pip3 also failed: {e2}")
+                        raise e
+                else:
+                    raise
             
             # Flask/Django 등 확인
             if (pr_dir / 'app.py').exists() or (pr_dir / 'main.py').exists():

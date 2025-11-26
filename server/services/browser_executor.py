@@ -21,7 +21,7 @@ class BrowserExecutor:
             use_mcp: Browser MCP 사용 여부 (기본값: True)
             base_url: 기본 URL (기본값: global.oliveyoung.com)
         """
-        self.base_url = base_url or os.getenv('BASE_URL', 'global.oliveyoung.com')
+        self.base_url = base_url or os.getenv('BASE_URL', 'localhost:5173')
         self.use_mcp = use_mcp and os.getenv('USE_BROWSER_MCP', 'true').lower() == 'true'
         
         if self.use_mcp:

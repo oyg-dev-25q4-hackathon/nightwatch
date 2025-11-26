@@ -256,16 +256,6 @@ function RepositoryDetail() {
                       )}
                     </p>
                   </div>
-                  {subscription.last_polled_at && (
-                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                      <p className="text-blue-100 text-xs mb-1">마지막 확인</p>
-                      <p className="text-white font-semibold">
-                        {new Date(
-                          subscription.last_polled_at
-                        ).toLocaleDateString("ko-KR")}
-                      </p>
-                    </div>
-                  )}
                   {subscription.exclude_branches && (
                     <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
                       <p className="text-blue-100 text-xs mb-1">제외 브랜치</p>
@@ -344,7 +334,7 @@ function RepositoryDetail() {
                 ) : (
                   <>
                     <span className="text-xl">🚀</span>
-                    <span>지금 감지하기</span>
+                    <span>브랜치 감지하기</span>
                   </>
                 )}
               </button>

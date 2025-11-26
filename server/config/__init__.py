@@ -1,7 +1,7 @@
 # Config Package
 import os
 
-BASE_URL = os.getenv('BASE_URL', 'global.oliveyoung.com')
+BASE_URL = os.getenv('BASE_URL', 'localhost:5173')
 API_PORT = int(os.getenv('API_PORT', 5001))
 POLLING_INTERVAL_MINUTES = int(os.getenv('POLLING_INTERVAL_MINUTES', 5))
 

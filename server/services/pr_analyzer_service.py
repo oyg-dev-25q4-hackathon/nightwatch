@@ -12,7 +12,7 @@ class PRAnalyzerService:
     def __init__(self, base_url=None):
         genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
         self.model = genai.GenerativeModel('gemini-1.5-pro')
-        self.base_url = base_url or os.getenv('BASE_URL', 'global.oliveyoung.com')
+        self.base_url = base_url or os.getenv('BASE_URL', 'localhost:5173')
     
     def analyze_and_generate_scenarios(self, pr_diff, pr_url=None):
         """PR diff를 분석하여 테스트 시나리오 생성"""
@@ -83,7 +83,12 @@ PR 변경사항:
             
             return scenarios
         except Exception as e:
-            print(f"Error generating scenarios: {e}")
+            error_msg = str(e)
+            print(f"Error generating scenarios: {error_msg}")
+            # API 키 관련 에러인 경우 예외를 다시 던짐
+            if 'API key' in error_msg or 'API_KEY' in error_msg or 'API key not valid' in error_msg:
+                raise ValueError(f"Gemini API 키가 유효하지 않습니다: {error_msg}")
+            # 그 외의 경우 기본 시나리오 반환 (기존 동작 유지)
             return self._get_default_scenarios(pr_url)
     
     def _format_diff(self, pr_diff):

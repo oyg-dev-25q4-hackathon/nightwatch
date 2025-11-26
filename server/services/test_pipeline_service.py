@@ -16,7 +16,7 @@ class TestPipelineService:
     """테스트 파이프라인 서비스"""
     
     def __init__(self, base_url=None):
-        self.base_url = base_url or os.getenv('BASE_URL', 'global.oliveyoung.com')
+        self.base_url = base_url or os.getenv('BASE_URL', 'localhost:5173')
     
     def run_test_pipeline(self, pr, pr_diff, branch_name, base_url=None):
         """
@@ -50,53 +50,12 @@ class TestPipelineService:
                 print(f"🌐 Using base URL from subscription: {base_url}")
                 print(f"   ✅ Generated PR URL: {pr_full_url}")
             else:
-                # 배포 URL이 없으면 배포 모드에 따라 배포
-                deployment_mode = os.getenv('DEPLOYMENT_MODE', 'local').lower()  # 'local', 'k8s', 'skip'
-                
-                if deployment_mode == 'skip':
-                    # 배포 건너뛰기: 기존 프로덕션 URL 사용 (PR 변경사항 반영 안됨)
-                    print(f"ℹ️ Skipping deployment (DEPLOYMENT_MODE=skip)")
-                    print(f"   ⚠️ Warning: PR changes will not be reflected in tests!")
-                    print(f"   Using production URL: {self.base_url}")
-                    pr_url = self.base_url
-                    pr_full_url = f"https://{self.base_url}"
-                    skip_deployment = True
-                elif deployment_mode == 'local':
-                    # 로컬에서 PR 브랜치 체크아웃 및 실행
-                    print(f"🚀 Deploying PR #{pr_number} locally...")
-                    local_deployer = LocalDeployer(base_domain=self.base_url)
-                    repo_name = pr.base.repo.full_name
-                    repo_url = pr.base.repo.clone_url  # GitHub clone URL
-                    
-                    deployment_info = local_deployer.deploy_pr(
-                        pr_number=pr_number,
-                        repo_name=repo_name,
-                        branch_name=branch_name,
-                        repo_url=repo_url
-                    )
-                    
-                    pr_url = deployment_info['url']  # localhost:8001
-                    pr_full_url = deployment_info['full_url']  # http://localhost:8001
-                    skip_deployment = False
-                    
-                    print(f"✅ PR deployed locally to: {pr_full_url}")
-                else:  # 'k8s'
-                    # 실제 Kubernetes 배포
-                    print(f"🚀 Deploying PR #{pr_number} to Kubernetes...")
-                    k8s_deployer = K8sDeployer(base_domain=self.base_url)
-                    repo_name = pr.base.repo.full_name
-                    
-                    deployment_info = k8s_deployer.deploy_pr(
-                        pr_number=pr_number,
-                        repo_name=repo_name,
-                        branch_name=branch_name
-                    )
-                    
-                    pr_url = deployment_info['url']
-                    pr_full_url = deployment_info['full_url']
-                    skip_deployment = False
-                    
-                    print(f"✅ PR deployed to: {pr_full_url}")
+                # 배포 URL이 없으면 로컬 모드로 실행 (localhost:5173 사용)
+                print(f"🌐 Using localhost:5173 for testing")
+                pr_url = "localhost:5173"
+                pr_full_url = f"http://{pr_url}"
+                skip_deployment = True  # 배포는 이미 되어 있다고 가정
+                print(f"   ✅ Using local URL: {pr_full_url}")
             
             # 2. PR 분석 및 시나리오 생성
             print("📝 Analyzing PR with Gemini...")

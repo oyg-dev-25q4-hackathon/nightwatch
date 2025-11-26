@@ -74,3 +74,9 @@ def rerun_scenario(test_id):
         return '', 200
     return test_controller.rerun_scenario(test_id)
 
+@api_bp.route('/tests/<int:test_id>/regenerate-scenarios', methods=['POST', 'OPTIONS'])
+def regenerate_scenarios(test_id):
+    if request.method == 'OPTIONS':
+        return '', 200
+    return test_controller.regenerate_scenarios(test_id)
+

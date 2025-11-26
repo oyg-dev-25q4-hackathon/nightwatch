@@ -11,6 +11,7 @@ function PRDetail() {
   const [test, setTest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [rerunningScenarios, setRerunningScenarios] = useState(new Set());
+  const [regeneratingScenarios, setRegeneratingScenarios] = useState(false);
 
   useEffect(() => {
     fetchTestDetail();
@@ -217,6 +218,32 @@ function PRDetail() {
     }
   };
 
+  const handleRegenerateScenarios = async () => {
+    if (!confirm("시나리오를 다시 생성하시겠습니까?\n\n기존 테스트 결과는 유지되고, 새로운 시나리오가 생성됩니다.")) {
+      return;
+    }
+
+    setRegeneratingScenarios(true);
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/tests/${testId}/regenerate-scenarios`
+      );
+
+      if (response.data.success) {
+        alert(`✅ ${response.data.message || `${response.data.scenarios_count}개의 시나리오가 생성되었습니다!`}`);
+        // 테스트 정보 새로고침
+        fetchTestDetail();
+      } else {
+        alert(`❌ 시나리오 생성 실패: ${response.data.error}`);
+      }
+    } catch (error) {
+      alert(`❌ 오류: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setRegeneratingScenarios(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
@@ -305,11 +332,30 @@ function PRDetail() {
 
         {/* 테스트 결과 */}
         <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl p-3">
-              <span className="text-2xl">📊</span>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl p-3">
+                <span className="text-2xl">📊</span>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">테스트 결과</h2>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">테스트 결과</h2>
+            <button
+              onClick={handleRegenerateScenarios}
+              disabled={regeneratingScenarios}
+              className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transform hover:-translate-y-0.5"
+            >
+              {regeneratingScenarios ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>생성 중...</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-xl">✨</span>
+                  <span>시나리오 생성하기</span>
+                </>
+              )}
+            </button>
           </div>
           <div className="border-2 border-gray-100 rounded-xl p-6 bg-gradient-to-br from-gray-50 to-blue-50">
             {renderTestResults(test.test_results)}

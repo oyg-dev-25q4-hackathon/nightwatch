@@ -173,12 +173,18 @@ class TestController:
                     'error': f'GitHub API error: {str(e)}. PAT가 필요할 수 있습니다.'
                 }), 401
             
-            # PR 배포 URL 생성 (기존 배포가 있다고 가정)
-            base_url = os.getenv('BASE_URL', 'global.oliveyoung.com')
-            pr_url = f"pr-{pr_number}.{base_url}"
+            # PR 배포 URL 생성
+            # subscription의 base_url 우선 사용, 없으면 로컬 모드 확인
+            if subscription and subscription.base_url:
+                base_url = subscription.base_url
+                pr_url = f"pr-{pr_number}.{base_url}"
+            else:
+                # base_url이 없으면 로컬 모드로 실행 (localhost:5173 사용)
+                pr_url = "localhost:5173"
+                base_url = None  # 로컬 모드에서는 base_url이 필요 없음
             
             # 시나리오 재실행
-            pipeline_service = TestPipelineService(base_url=base_url)
+            pipeline_service = TestPipelineService(base_url=base_url or os.getenv('BASE_URL', 'localhost:5173'))
             
             # 결과 객체에서 원본 시나리오 정보 복원
             # scenario_result가 결과 형태인 경우 원본 형태로 변환
@@ -254,6 +260,103 @@ class TestController:
                 'success': False,
                 'error': str(e)
             }), 500
+        finally:
+            db.close()
+    
+    def regenerate_scenarios(self, test_id):
+        """시나리오 재생성 (실행 없이 시나리오만 생성)"""
+        db = next(get_db())
+        try:
+            test = db.query(Test).filter(Test.id == test_id).first()
+            
+            if not test:
+                return jsonify({
+                    'success': False,
+                    'error': 'Test not found'
+                }), 404
+            
+            # 구독 정보 가져오기
+            subscription = db.query(Subscription).filter(
+                Subscription.id == test.subscription_id
+            ).first()
+            
+            if not subscription:
+                return jsonify({
+                    'success': False,
+                    'error': 'Subscription not found'
+                }), 404
+            
+            # PAT 가져오기
+            pat = None
+            pat_auth = PATAuthService()
+            if subscription.user_credential_id:
+                credential = pat_auth.get_credential_by_id(subscription.user_credential_id)
+                if credential:
+                    pat = pat_auth.get_decrypted_pat(credential.user_id)
+            
+            # GitHub에서 PR 정보 가져오기
+            try:
+                if pat:
+                    g = Github(pat)
+                else:
+                    g = Github()
+                
+                repo = g.get_repo(test.repo_full_name)
+                pr = repo.get_pull(test.pr_number)
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': f'GitHub API error: {str(e)}. PAT가 필요할 수 있습니다.'
+                }), 401
+            
+            # PR diff 가져오기
+            pipeline_service = TestPipelineService(base_url=subscription.base_url)
+            pr_diff = pipeline_service.get_pr_diff(pr)
+            
+            # PR 배포 URL 생성
+            if subscription.base_url:
+                base_url = subscription.base_url
+                pr_url = f"pr-{test.pr_number}.{base_url}"
+            else:
+                # base_url이 없으면 로컬 모드로 실행 (localhost:5173 사용)
+                pr_url = "localhost:5173"
+                base_url = None
+            
+            # 시나리오 재생성
+            from ..services.pr_analyzer_service import PRAnalyzerService
+            analyzer = PRAnalyzerService(base_url=base_url)
+            try:
+                scenarios = analyzer.analyze_and_generate_scenarios(pr_diff, pr_url=pr_url)
+            except ValueError as e:
+                # API 키 관련 에러 등 명시적인 에러
+                return jsonify({
+                    'success': False,
+                    'error': str(e)
+                }), 400
+            except Exception as e:
+                # 기타 예상치 못한 에러
+                return jsonify({
+                    'success': False,
+                    'error': f'시나리오 생성 중 오류가 발생했습니다: {str(e)}'
+                }), 500
+            
+            # test_results를 시나리오만 저장 (실행 결과 없음)
+            # 시나리오를 원본 형태로 저장
+            test.test_results = scenarios
+            test.status = 'pending'  # 시나리오만 생성되었으므로 pending 상태
+            db.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'{len(scenarios)}개의 시나리오가 생성되었습니다.',
+                'scenarios_count': len(scenarios),
+                'scenarios': scenarios
+            }), 200
+            
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Error regenerating scenarios: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
         finally:
             db.close()
 

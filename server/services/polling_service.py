@@ -17,7 +17,7 @@ class PollingService:
         self.subscription_service = SubscriptionService()
         self.pat_auth = PATAuthService()
         self.test_pipeline = TestPipelineService()
-        self.base_url = os.getenv('BASE_URL', 'global.oliveyoung.com')
+        self.base_url = os.getenv('BASE_URL', 'localhost:5173')
     
     def poll_all_subscriptions(self):
         """모든 활성 구독에 대해 PR 확인 및 테스트 실행"""
