@@ -10,6 +10,7 @@ function RepositoryDetail() {
   const [subscription, setSubscription] = useState(null);
   const [prs, setPrs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [creatingDummy, setCreatingDummy] = useState(false);
 
   useEffect(() => {
     fetchSubscription();
@@ -57,6 +58,27 @@ function RepositoryDetail() {
       console.error("PR 목록 조회 실패:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createDummyPR = async (status = 'completed') => {
+    try {
+      setCreatingDummy(true);
+      const response = await axios.post(`${API_BASE_URL}/api/tests/dummy`, {
+        subscription_id: parseInt(subscriptionId),
+        status: status,
+      });
+      
+      if (response.data.success) {
+        alert(`테스트용 PR #${response.data.test.pr_number}이 생성되었습니다!`);
+        fetchPRs(); // PR 목록 새로고침
+      } else {
+        alert(`오류: ${response.data.error}`);
+      }
+    } catch (error) {
+      alert(`오류: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setCreatingDummy(false);
     }
   };
 
@@ -172,6 +194,56 @@ function RepositoryDetail() {
                   <p className="text-sm text-gray-600">
                     총 {prs.length}개의 PR이 감지되었습니다
                   </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => createDummyPR('completed')}
+                  disabled={creatingDummy}
+                  className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {creatingDummy ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>생성 중...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>✨</span>
+                      <span>테스트 PR 생성</span>
+                    </>
+                  )}
+                </button>
+                <div className="relative group">
+                  <button className="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors">
+                    <span>⚙️</span>
+                  </button>
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                    <button
+                      onClick={() => createDummyPR('pending')}
+                      className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-t-lg text-sm"
+                    >
+                      ⏳ 대기 상태 PR
+                    </button>
+                    <button
+                      onClick={() => createDummyPR('running')}
+                      className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
+                    >
+                      🔄 실행 중 PR
+                    </button>
+                    <button
+                      onClick={() => createDummyPR('completed')}
+                      className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
+                    >
+                      ✅ 완료 PR
+                    </button>
+                    <button
+                      onClick={() => createDummyPR('failed')}
+                      className="w-full text-left px-4 py-2 hover:bg-gray-50 rounded-b-lg text-sm"
+                    >
+                      ❌ 실패 PR
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
