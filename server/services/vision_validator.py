@@ -1,24 +1,26 @@
 # server/services/vision_validator.py
-import google.generativeai as genai
-import os
-import json
 import base64
-from PIL import Image
-import io
+import json
+import os
+
+from vertexai.generative_models import GenerativeModel, Part
+
+from .vertex_ai import get_vision_model
+
 
 class VisionValidator:
     def __init__(self):
-        genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-        self.model = genai.GenerativeModel('gemini-1.5-pro')
+        model_name = os.getenv('VERTEX_VISION_MODEL_NAME')
+        self.model: GenerativeModel = get_vision_model(model_name)
     
     def validate_screenshot(self, screenshot_b64, expected_result):
         """스크린샷이 예상 결과와 일치하는지 검증"""
         
         try:
-            # base64를 PIL Image로 변환
+            # base64를 이미지 Part로 변환
             image_data = base64.b64decode(screenshot_b64)
-            image = Image.open(io.BytesIO(image_data))
-            
+            image_part = Part.from_image(image_bytes=image_data)
+
             prompt = f"""
 당신은 UI/UX 테스트 전문가입니다. 다음 스크린샷을 분석하고, 예상 결과와 일치하는지 검증해주세요.
 
@@ -47,7 +49,7 @@ JSON만 반환하세요 (마크다운 코드블록 없이).
 
 """
             
-            response = self.model.generate_content([prompt, image])
+            response = self.model.generate_content([prompt, image_part])
             response_text = response.text.strip()
             
             # 마크다운 코드블록 제거

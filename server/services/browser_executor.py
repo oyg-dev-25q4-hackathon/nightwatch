@@ -211,47 +211,26 @@ class BrowserExecutor:
         try:
             if action_type == 'goto':
                 result = self.mcp_client.navigate(action['url'])
-                if not result.get('success') and result.get('fallback'):
-                    raise Exception(result.get('error', 'MCP connection failed'))
-                return {'action': action, 'success': result.get('success', False), 'error': result.get('error')}
-            
             elif action_type == 'fill':
                 result = self.mcp_client.fill(action['selector'], action['value'])
-                if not result.get('success') and result.get('fallback'):
-                    raise Exception(result.get('error', 'MCP connection failed'))
-                return {'action': action, 'success': result.get('success', False), 'error': result.get('error')}
-            
             elif action_type == 'click':
                 result = self.mcp_client.click(action['selector'])
-                if not result.get('success') and result.get('fallback'):
-                    raise Exception(result.get('error', 'MCP connection failed'))
-                return {'action': action, 'success': result.get('success', False), 'error': result.get('error')}
-            
             elif action_type == 'wait':
                 result = self.mcp_client.wait(action.get('seconds', 1))
                 return {'action': action, 'success': result.get('success', True)}
-            
             elif action_type == 'screenshot':
                 result = self.mcp_client.screenshot(full_page=True)
                 if result.get('success'):
                     screenshot_data = result.get('screenshot')
-                    # MCP에서 받은 스크린샷을 base64로 변환
                     screenshot_b64 = screenshot_data if isinstance(screenshot_data, str) else base64.b64encode(screenshot_data).decode()
-                    return {
-                        'action': action,
-                        'success': True,
-                        'screenshot': screenshot_b64
-                    }
-                if result.get('fallback'):
-                    raise Exception(result.get('error', 'MCP connection failed'))
+                    return {'action': action, 'success': True, 'screenshot': screenshot_b64}
                 return {'action': action, 'success': False, 'error': result.get('error')}
-            
             else:
-                return {
-                    'action': action,
-                    'success': False,
-                    'error': f'Unknown action type: {action_type}'
-                }
+                return {'action': action, 'success': False, 'error': f'Unknown action type: {action_type}'}
+            
+            if not result.get('success') and result.get('fallback'):
+                raise Exception(result.get('error', 'MCP connection failed'))
+            return {'action': action, 'success': result.get('success', False), 'error': result.get('error')}
         except Exception as e:
             # MCP 연결 실패 시 예외를 다시 발생시켜 폴백 로직으로 전달
             return {'action': action, 'success': False, 'error': str(e), 'fallback': True}

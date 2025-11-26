@@ -117,27 +117,27 @@ function PRDetail() {
               )}
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
                 <div className="flex items-center gap-4">
-                  {scenario.success !== undefined && (
-                    <div
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold ${
-                        scenario.success
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
+                {scenario.success !== undefined && (
+                  <div
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold ${
+                      scenario.success
+                        ? "bg-green-100 text-green-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
                       <span className="text-lg">
                         {scenario.success ? "✅" : "❌"}
                       </span>
-                      <span>{scenario.success ? "성공" : "실패"}</span>
-                    </div>
-                  )}
-                  {scenario.error && (
-                    <div className="flex-1 bg-red-50 border-l-4 border-red-500 rounded p-3">
+                    <span>{scenario.success ? "성공" : "실패"}</span>
+                  </div>
+                )}
+                {scenario.error && (
+                  <div className="flex-1 bg-red-50 border-l-4 border-red-500 rounded p-3">
                       <p className="text-sm text-red-700 font-medium">
                         오류: {scenario.error}
                       </p>
-                    </div>
-                  )}
+                  </div>
+                )}
                 </div>
                 <button
                   onClick={() => handleRerunScenario(idx)}
@@ -334,10 +334,10 @@ function PRDetail() {
         <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl p-3">
-                <span className="text-2xl">📊</span>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900">테스트 결과</h2>
+            <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl p-3">
+              <span className="text-2xl">📊</span>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">테스트 결과</h2>
             </div>
             <button
               onClick={handleRegenerateScenarios}

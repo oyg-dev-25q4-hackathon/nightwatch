@@ -124,7 +124,7 @@ class TestPipelineService:
                 try:
                     k8s_deployer = K8sDeployer(base_domain=self.base_url)
                     k8s_deployer.cleanup_pr(pr_number)
-                except:
+                except Exception:
                     pass
             
             return {

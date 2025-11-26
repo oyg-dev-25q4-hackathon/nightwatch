@@ -4,6 +4,7 @@ PAT 암호화/복호화 유틸리티
 """
 import os
 import base64
+import binascii
 from cryptography.fernet import Fernet
 
 def get_encryption_key():
@@ -38,7 +39,10 @@ def decrypt_pat(encrypted_pat: str) -> str:
     """암호화된 PAT를 복호화하여 반환"""
     key = get_encryption_key()
     f = Fernet(key)
-    encrypted_bytes = base64.b64decode(encrypted_pat.encode())
+    try:
+        encrypted_bytes = base64.b64decode(encrypted_pat.encode())
+    except (binascii.Error, ValueError) as e:
+        raise ValueError("Invalid encrypted PAT format") from e
     decrypted = f.decrypt(encrypted_bytes)
     return decrypted.decode()
 

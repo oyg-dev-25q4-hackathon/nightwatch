@@ -1,7 +1,10 @@
 # src/pr_analyzer.py
-import google.generativeai as genai
-import os
 import json
+import os
+
+from vertexai.generative_models import GenerativeModel
+
+from .vertex_ai import get_text_model
 
 class PRAnalyzer:
     def __init__(self, base_url=None):
@@ -9,9 +12,9 @@ class PRAnalyzer:
         Args:
             base_url: 기본 웹사이트 URL (기본값: global.oliveyoung.com)
         """
-        genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-        self.model = genai.GenerativeModel('gemini-1.5-pro')
-        self.base_url = base_url or os.getenv('BASE_URL', 'global.oliveyoung.com')
+        model_name = os.getenv('VERTEX_MODEL_NAME')
+        self.model: GenerativeModel = get_text_model(model_name)
+        self.base_url = base_url or os.getenv('BASE_URL', 'localhost:5173')
     
     def analyze_and_generate_scenarios(self, pr_diff, pr_url=None):
         """

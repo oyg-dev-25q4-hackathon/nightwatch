@@ -2,16 +2,19 @@
 """
 PR 분석 및 테스트 시나리오 생성 서비스
 """
-import google.generativeai as genai
-import os
 import json
+import os
+
+from vertexai.generative_models import GenerativeModel
+
+from .vertex_ai import get_text_model
 
 class PRAnalyzerService:
     """PR 분석 서비스"""
     
     def __init__(self, base_url=None):
-        genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
-        self.model = genai.GenerativeModel('gemini-1.5-pro')
+        model_name = os.getenv('VERTEX_MODEL_NAME')
+        self.model: GenerativeModel = get_text_model(model_name)
         self.base_url = base_url or os.getenv('BASE_URL', 'localhost:5173')
     
     def analyze_and_generate_scenarios(self, pr_diff, pr_url=None):

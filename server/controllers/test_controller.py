@@ -355,7 +355,9 @@ class TestController:
             
         except Exception as e:
             db.rollback()
-            print(f"❌ Error regenerating scenarios: {str(e)}")
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"❌ Error regenerating scenarios: {str(e)}\n{error_trace}")
             return jsonify({'success': False, 'error': str(e)}), 500
         finally:
             db.close()

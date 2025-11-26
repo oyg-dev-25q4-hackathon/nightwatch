@@ -78,7 +78,7 @@ hackerton/
 1. **쿠버네티스 자동 배포**: PR 생성 시 자동으로 `pr-{번호}.global.oliveyoung.com` 형태로 배포
 2. **AI 기반 시나리오 생성**: Gemini API로 PR 변경사항 분석 후 테스트 시나리오 자동 생성
 3. **Browser MCP 자동화**: Browser MCP를 사용하여 실제 브라우저에서 테스트 실행
-4. **Vision 검증**: Gemini Vision API로 스크린샷 검증
+4. **Vision 검증**: Vertex AI Gemini 모델로 스크린샷 검증
 5. **자동 정리**: PR이 닫히거나 머지될 때 배포 자동 정리
 
 ## 🔑 환경 변수 설정
@@ -86,18 +86,25 @@ hackerton/
 `.env` 파일을 생성하고 다음 내용을 추가하세요:
 
 ```bash
-# API Keys
-GEMINI_API_KEY=your-gemini-api-key-here
+# Vertex AI 설정
+VERTEX_PROJECT_ID=your-gcp-project-id
+VERTEX_LOCATION=us-central1
+VERTEX_MODEL_NAME=gemini-1.0-pro
+VERTEX_VISION_MODEL_NAME=gemini-1.0-pro-vision
+GOOGLE_APPLICATION_CREDENTIALS=credentials/vertex_service_account.json
+
+# 기타 필수 값
 SLACK_TOKEN=xoxb-your-slack-bot-token
 SLACK_CHANNEL=#test-alerts
 GITHUB_TOKEN=ghp_your-github-token
 GITHUB_WEBHOOK_SECRET=your-webhook-secret
+ENCRYPTION_KEY=your-encryption-key
 
 # 웹사이트 설정
-BASE_URL=global.oliveyoung.com  # 기본 웹사이트 URL (변경 가능)
+BASE_URL=localhost:5173  # 기본 웹사이트 URL (변경 가능)
 
 # 쿠버네티스 설정
-SKIP_K8S_DEPLOYMENT=true  # K8s 배포 건너뛰기 (기본값: true, 프로덕션 URL 사용)
+SKIP_K8S_DEPLOYMENT=true  # K8s 배포 건너뛰기 (기본값: true, 로컬 URL 사용)
 K8S_NAMESPACE=default  # 쿠버네티스 네임스페이스 (SKIP_K8S_DEPLOYMENT=false일 때만 필요)
 DEPLOYMENT_PREFIX=pr-preview  # 배포 이름 접두사
 
@@ -105,6 +112,12 @@ DEPLOYMENT_PREFIX=pr-preview  # 배포 이름 접두사
 USE_BROWSER_MCP=true  # Browser MCP 사용 여부 (true/false)
 MCP_SERVER_URL=http://localhost:3000  # MCP 서버 URL (선택사항)
 ```
+
+> **서비스 계정 JSON 파일**
+>
+> 1. Vertex AI 접근 권한이 있는 서비스 계정을 만들고 키(JSON)를 다운로드합니다.  
+> 2. `credentials/vertex_service_account.json` 경로에 저장합니다. (저장소에는 `.gitkeep`만 커밋되며 JSON은 `.gitignore` 처리됩니다.)  
+> 3. `.env`의 `GOOGLE_APPLICATION_CREDENTIALS`에 해당 경로를 설정하면 별도의 API Key 없이 인증이 진행됩니다.
 
 ## 🚀 실행 방법
 
@@ -151,7 +164,7 @@ python test_manual.py
 
 ## 📦 주요 의존성
 
-- `google-generativeai==0.3.2` - Gemini API
+- `google-cloud-aiplatform==1.38.1` - Vertex AI (Gemini) SDK
 - `playwright==1.40.0` - 브라우저 자동화 (Browser MCP 폴백용)
 - `flask==3.0.0` - Webhook 서버
 - `slack-sdk==3.23.0` - Slack 알림

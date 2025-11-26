@@ -2,11 +2,15 @@
 """
 Personal Access Token 인증 서비스
 """
+import logging
 import requests
 from typing import Dict, Optional
 from datetime import datetime
 from ..models import UserCredential, get_db
 from ..utils.crypto import encrypt_pat, decrypt_pat
+
+logger = logging.getLogger(__name__)
+
 
 class PATAuthService:
     """PAT 인증 및 관리 서비스"""
@@ -173,7 +177,11 @@ class PATAuthService:
             ).first()
             
             if credential:
-                return decrypt_pat(credential.encrypted_pat)
+                try:
+                    return decrypt_pat(credential.encrypted_pat)
+                except ValueError as e:
+                    logger.warning(f"Failed to decrypt PAT for user {user_id}: {e}")
+                    return None
             return None
         finally:
             db.close()

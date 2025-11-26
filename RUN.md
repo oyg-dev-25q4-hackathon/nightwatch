@@ -78,22 +78,28 @@ npm run dev
 
 ### 필수 환경 변수 확인
 
-`.env` 파일에 다음이 설정되어 있어야 합니다:
+Vertex AI 기반 인증으로 변경되었습니다. `.env` 파일에 다음을 설정해주세요:
 
 ```bash
-# 필수
-GEMINI_API_KEY=your-key
+# Vertex AI
+VERTEX_PROJECT_ID=your-gcp-project-id
+VERTEX_LOCATION=us-central1
+VERTEX_MODEL_NAME=gemini-1.0-pro
+VERTEX_VISION_MODEL_NAME=gemini-1.0-pro-vision
+GOOGLE_APPLICATION_CREDENTIALS=credentials/vertex_service_account.json
+
+# 기타 필수 값
 SLACK_TOKEN=xoxb-your-token
 SLACK_CHANNEL=#test-alerts
 ENCRYPTION_KEY=your-encryption-key
 
 # 선택사항
-BASE_URL=global.oliveyoung.com
+BASE_URL=localhost:5173
 API_PORT=5001
 POLLING_INTERVAL_MINUTES=5
 
 # 배포 모드 설정
-# - 'local': 로컬에서 PR 브랜치 체크아웃 후 실행 (PR 변경사항 반영됨, 권장)
+# - 'local': 로컬에서 PR 브랜치를 체크아웃 후 실행 (PR 변경사항 반영됨, 권장)
 # - 'k8s': Kubernetes 배포 (구현 필요)
 # - 'skip': 배포 건너뛰기, 프로덕션 URL 사용 (PR 변경사항 반영 안됨)
 DEPLOYMENT_MODE=local
@@ -102,6 +108,12 @@ DEPLOYMENT_MODE=local
 PR_DEPLOYMENT_DIR=./pr_deployments  # PR 체크아웃 디렉토리
 PR_PORT_BASE=8000  # PR 포트 시작 번호 (PR #1 = 8001, PR #2 = 8002)
 ```
+
+> **서비스 계정 JSON 파일**
+>
+> 1. Google Cloud Console에서 Vertex AI에 접근 가능한 서비스 계정을 생성하고 키(JSON)를 다운로드합니다.
+> 2. `credentials/vertex_service_account.json` 경로에 저장합니다. (저장소에는 `.gitkeep`만 커밋되고 JSON은 `.gitignore`로 제외됩니다.)
+> 3. `.env`의 `GOOGLE_APPLICATION_CREDENTIALS`에 해당 경로를 지정하면 별도의 API Key 없이 인증이 진행됩니다.
 
 ### 패키지 설치 확인
 

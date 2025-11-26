@@ -5,11 +5,13 @@
 import os
 import threading
 from dotenv import load_dotenv
+
+# .env를 먼저 로드하여 이후 임포트되는 모듈들이 환경변수에 접근할 수 있게 함
+load_dotenv()
+
 from server.app import app
 from server.services.polling_scheduler import PollingScheduler
 from server.config import POLLING_INTERVAL_MINUTES
-
-load_dotenv()
 
 def run_api_server():
     """API 서버 실행"""
@@ -42,8 +44,12 @@ if __name__ == "__main__":
     os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
     os.makedirs(REPORTS_DIR, exist_ok=True)
     
+    vertex_ready = os.getenv('VERTEX_PROJECT_ID') and (
+        os.getenv('GOOGLE_APPLICATION_CREDENTIALS') or
+        os.path.exists(os.path.join(os.path.dirname(__file__), 'credentials', 'vertex_service_account.json'))
+    )
     print("🌙 NightWatch Server Starting...")
-    print(f"Gemini API Key: {'✓ Set' if os.getenv('GEMINI_API_KEY') else '✗ Missing'}")
+    print(f"Vertex Credentials: {'✓ Ready' if vertex_ready else '✗ Missing'}")
     print(f"Slack Token: {'✓ Set' if os.getenv('SLACK_TOKEN') else '✗ Missing'}")
     print(f"Encryption Key: {'✓ Set' if os.getenv('ENCRYPTION_KEY') else '✗ Missing (will generate)'}")
     

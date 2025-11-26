@@ -19,8 +19,12 @@ if __name__ == "__main__":
     # 데이터베이스 초기화
     init_db()
     
+    vertex_ready = os.getenv('VERTEX_PROJECT_ID') and (
+        os.getenv('GOOGLE_APPLICATION_CREDENTIALS') or
+        os.path.exists(os.path.join(os.path.dirname(__file__), 'credentials', 'vertex_service_account.json'))
+    )
     print("🌙 NightWatch Server Starting...")
-    print(f"Gemini API Key: {'✓ Set' if os.getenv('GEMINI_API_KEY') else '✗ Missing'}")
+    print(f"Vertex Credentials: {'✓ Ready' if vertex_ready else '✗ Missing'}")
     print(f"Slack Token: {'✓ Set' if os.getenv('SLACK_TOKEN') else '✗ Missing'}")
     
     # Flask 개발 서버 경고 숨기기
