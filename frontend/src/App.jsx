@@ -1,10 +1,15 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
+import { BrowserRouter, Route, Routes, useNavigate } from "react-router-dom";
 import "./App.css";
+import PRDetail from "./pages/PRDetail";
+import RepositoryDetail from "./pages/RepositoryDetail";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
-function App() {
+// 홈 페이지 컴포넌트
+function Home() {
+  const navigate = useNavigate();
   const [subscriptions, setSubscriptions] = useState([]);
   const [tests, setTests] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -282,7 +287,11 @@ function App() {
           ) : (
             <div className="grid gap-4">
               {subscriptions.map((sub) => (
-                <div key={sub.id} className="bg-white rounded-lg shadow p-6">
+                <div
+                  key={sub.id}
+                  onClick={() => navigate(`/subscriptions/${sub.id}`)}
+                  className="bg-white rounded-lg shadow p-6 hover:shadow-lg cursor-pointer transition-shadow"
+                >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center mb-2">
@@ -314,7 +323,10 @@ function App() {
                       </div>
                     </div>
                     <button
-                      onClick={() => handleDeleteSubscription(sub.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSubscription(sub.id);
+                      }}
                       className="ml-4 px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded transition-colors"
                     >
                       구독 해제
@@ -553,6 +565,25 @@ function App() {
         </div>
       )}
     </div>
+  );
+}
+
+// 메인 App 컴포넌트 (라우터 설정)
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route
+          path="/subscriptions/:subscriptionId"
+          element={<RepositoryDetail />}
+        />
+        <Route
+          path="/subscriptions/:subscriptionId/prs/:testId"
+          element={<PRDetail />}
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
