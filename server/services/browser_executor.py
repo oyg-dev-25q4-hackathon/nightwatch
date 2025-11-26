@@ -52,13 +52,43 @@ class BrowserExecutor:
         시나리오 실행
         
         Args:
-            scenario: 테스트 시나리오 딕셔너리
+            scenario: 테스트 시나리오 딕셔너리 (원본 형태 또는 결과 형태)
             pr_url: PR 배포 URL (있을 경우 시나리오의 URL을 대체)
         """
+        # 시나리오가 결과 형태인지 원본 형태인지 확인
+        scenario_name = scenario.get('scenario_name') or scenario.get('name', 'Unknown Scenario')
+        description = scenario.get('description', '')
+        expected_result = scenario.get('expected_result', '')
+        actions = scenario.get('actions', [])
+        
+        # actions가 없고 actions_executed가 있으면 원본 actions 추출 시도
+        if not actions and 'actions_executed' in scenario:
+            actions_executed = scenario.get('actions_executed', [])
+            for action_result in actions_executed:
+                if 'action' in action_result:
+                    actions.append(action_result['action'])
+                elif 'type' in action_result:
+                    # action_result 자체가 action 형태일 수 있음
+                    action = {k: v for k, v in action_result.items() 
+                             if k not in ['success', 'error', 'screenshot', 'screenshot_path']}
+                    if action:
+                        actions.append(action)
+        
+        if not actions:
+            return {
+                'scenario_name': scenario_name,
+                'description': description,
+                'expected_result': expected_result,
+                'actions_executed': [],
+                'success': False,
+                'error': '시나리오에 실행할 액션이 없습니다.',
+                'screenshot': None
+            }
+        
         result = {
-            'scenario_name': scenario['name'],
-            'description': scenario['description'],
-            'expected_result': scenario['expected_result'],
+            'scenario_name': scenario_name,
+            'description': description,
+            'expected_result': expected_result,
             'actions_executed': [],
             'success': True,
             'error': None,
@@ -66,7 +96,7 @@ class BrowserExecutor:
         }
         
         try:
-            for action in scenario['actions']:
+            for action in actions:
                 # PR URL이 있으면 goto 액션의 URL을 대체
                 if action['type'] == 'goto' and pr_url:
                     # 상대 경로인 경우 PR URL과 결합
@@ -106,7 +136,15 @@ class BrowserExecutor:
         
         try:
             if self.use_mcp and self.mcp_client:
-                return self._execute_action_mcp(action)
+                result = self._execute_action_mcp(action)
+                # MCP 연결 실패 시 Playwright로 폴백
+                if not result.get('success') and result.get('error') and 'Connection' in result.get('error', ''):
+                    print(f"⚠️ MCP 연결 실패, Playwright로 폴백: {result.get('error')}")
+                    # Playwright 초기화 (아직 안 되어 있다면)
+                    if not self.playwright:
+                        self._init_playwright()
+                    return self._execute_action_playwright(action)
+                return result
             else:
                 return self._execute_action_playwright(action)
                 
@@ -117,45 +155,77 @@ class BrowserExecutor:
                 'error': str(e)
             }
     
+    def _init_playwright(self):
+        """Playwright 초기화 (폴백용)"""
+        if self.playwright:
+            return
+        
+        from ..config import VIDEOS_DIR
+        self.video_dir = os.path.join(VIDEOS_DIR, "fallback")
+        os.makedirs(self.video_dir, exist_ok=True)
+        self.playwright = sync_playwright().start()
+        self.browser = self.playwright.chromium.launch(
+            headless=True,
+            args=['--no-sandbox', '--disable-setuid-sandbox']
+        )
+        self.context = self.browser.new_context(
+            viewport={'width': 1920, 'height': 1080},
+            record_video_dir=self.video_dir,
+            record_video_size={'width': 1920, 'height': 1080}
+        )
+        self.page = self.context.new_page()
+    
     def _execute_action_mcp(self, action):
         """Browser MCP를 사용하여 액션 실행"""
         action_type = action['type']
         
-        if action_type == 'goto':
-            result = self.mcp_client.navigate(action['url'])
-            return {'action': action, 'success': result.get('success', False), 'error': result.get('error')}
-        
-        elif action_type == 'fill':
-            result = self.mcp_client.fill(action['selector'], action['value'])
-            return {'action': action, 'success': result.get('success', False), 'error': result.get('error')}
-        
-        elif action_type == 'click':
-            result = self.mcp_client.click(action['selector'])
-            return {'action': action, 'success': result.get('success', False), 'error': result.get('error')}
-        
-        elif action_type == 'wait':
-            result = self.mcp_client.wait(action.get('seconds', 1))
-            return {'action': action, 'success': result.get('success', True)}
-        
-        elif action_type == 'screenshot':
-            result = self.mcp_client.screenshot(full_page=True)
-            if result.get('success'):
-                screenshot_data = result.get('screenshot')
-                # MCP에서 받은 스크린샷을 base64로 변환
-                screenshot_b64 = screenshot_data if isinstance(screenshot_data, str) else base64.b64encode(screenshot_data).decode()
+        try:
+            if action_type == 'goto':
+                result = self.mcp_client.navigate(action['url'])
+                if not result.get('success') and result.get('fallback'):
+                    raise Exception(result.get('error', 'MCP connection failed'))
+                return {'action': action, 'success': result.get('success', False), 'error': result.get('error')}
+            
+            elif action_type == 'fill':
+                result = self.mcp_client.fill(action['selector'], action['value'])
+                if not result.get('success') and result.get('fallback'):
+                    raise Exception(result.get('error', 'MCP connection failed'))
+                return {'action': action, 'success': result.get('success', False), 'error': result.get('error')}
+            
+            elif action_type == 'click':
+                result = self.mcp_client.click(action['selector'])
+                if not result.get('success') and result.get('fallback'):
+                    raise Exception(result.get('error', 'MCP connection failed'))
+                return {'action': action, 'success': result.get('success', False), 'error': result.get('error')}
+            
+            elif action_type == 'wait':
+                result = self.mcp_client.wait(action.get('seconds', 1))
+                return {'action': action, 'success': result.get('success', True)}
+            
+            elif action_type == 'screenshot':
+                result = self.mcp_client.screenshot(full_page=True)
+                if result.get('success'):
+                    screenshot_data = result.get('screenshot')
+                    # MCP에서 받은 스크린샷을 base64로 변환
+                    screenshot_b64 = screenshot_data if isinstance(screenshot_data, str) else base64.b64encode(screenshot_data).decode()
+                    return {
+                        'action': action,
+                        'success': True,
+                        'screenshot': screenshot_b64
+                    }
+                if result.get('fallback'):
+                    raise Exception(result.get('error', 'MCP connection failed'))
+                return {'action': action, 'success': False, 'error': result.get('error')}
+            
+            else:
                 return {
                     'action': action,
-                    'success': True,
-                    'screenshot': screenshot_b64
+                    'success': False,
+                    'error': f'Unknown action type: {action_type}'
                 }
-            return {'action': action, 'success': False, 'error': result.get('error')}
-        
-        else:
-            return {
-                'action': action,
-                'success': False,
-                'error': f'Unknown action type: {action_type}'
-            }
+        except Exception as e:
+            # MCP 연결 실패 시 예외를 다시 발생시켜 폴백 로직으로 전달
+            return {'action': action, 'success': False, 'error': str(e), 'fallback': True}
     
     def _execute_action_playwright(self, action):
         """Playwright를 사용하여 액션 실행 (폴백)"""

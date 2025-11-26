@@ -68,3 +68,9 @@ def get_tests():
 def get_test(test_id):
     return test_controller.get_test(test_id)
 
+@api_bp.route('/tests/<int:test_id>/rerun-scenario', methods=['POST', 'OPTIONS'])
+def rerun_scenario(test_id):
+    if request.method == 'OPTIONS':
+        return '', 200
+    return test_controller.rerun_scenario(test_id)
+

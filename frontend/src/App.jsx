@@ -2,6 +2,7 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import { BrowserRouter, Route, Routes, useNavigate } from "react-router-dom";
 import "./App.css";
+import Header from "./components/Header";
 import PRDetail from "./pages/PRDetail";
 import RepositoryDetail from "./pages/RepositoryDetail";
 
@@ -329,43 +330,34 @@ function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <span className="text-2xl">🌙</span>
-              <h1 className="ml-2 text-2xl font-bold text-gray-900">
-                NightWatch
-              </h1>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={triggerAllPolling}
-                disabled={pollingAll}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {pollingAll ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>감지 중...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🚀</span>
-                    <span>전체 감지</span>
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-              >
-                + 레포지토리 추가
-              </button>
-            </div>
-          </div>
+      <Header />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={triggerAllPolling}
+            disabled={pollingAll}
+            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {pollingAll ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>감지 중...</span>
+              </>
+            ) : (
+              <>
+                <span>🚀</span>
+                <span>전체 감지</span>
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+          >
+            + 레포지토리 추가
+          </button>
         </div>
-      </header>
+      </div>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

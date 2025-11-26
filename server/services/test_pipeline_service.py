@@ -121,4 +121,43 @@ class TestPipelineService:
             })
         
         return diff_content
+    
+    def rerun_scenario(self, scenario, pr_url=None):
+        """
+        특정 시나리오만 재실행
+        
+        Args:
+            scenario: 재실행할 시나리오 딕셔너리
+            pr_url: PR 배포 URL (선택사항)
+        
+        Returns:
+            dict: 시나리오 실행 결과
+        """
+        from ..config import VIDEOS_DIR
+        import os
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        os.makedirs(VIDEOS_DIR, exist_ok=True)
+        
+        executor = BrowserExecutor(
+            video_dir=os.path.join(VIDEOS_DIR, f"rerun_{timestamp}"),
+            use_mcp=True,
+            base_url=self.base_url
+        )
+        
+        try:
+            # 시나리오 실행
+            result = executor.execute_scenario(scenario, pr_url=pr_url)
+            
+            # Vision API로 검증
+            if result['success'] and result.get('screenshot'):
+                validator = VisionValidator()
+                validation = validator.validate_screenshot(
+                    result['screenshot'],
+                    result.get('expected_result', '')
+                )
+                result['validation'] = validation
+            
+            return result
+        finally:
+            executor.close()
 
