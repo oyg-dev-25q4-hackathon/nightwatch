@@ -2,7 +2,7 @@
 """
 API 라우트 정의
 """
-from flask import Blueprint
+from flask import Blueprint, request
 from ..controllers.subscription_controller import SubscriptionController
 from ..controllers.pat_controller import PATController
 from ..controllers.test_controller import TestController
@@ -32,12 +32,22 @@ def get_subscription(subscription_id):
 def delete_subscription(subscription_id):
     return subscription_controller.delete_subscription(subscription_id)
 
-@api_bp.route('/subscriptions/<int:subscription_id>/poll', methods=['POST'])
+@api_bp.route('/subscriptions/<int:subscription_id>/poll', methods=['POST', 'OPTIONS'])
 def trigger_polling(subscription_id):
+    if request.method == 'OPTIONS':
+        return '', 200
     return subscription_controller.trigger_polling(subscription_id)
 
-@api_bp.route('/subscriptions/poll-all', methods=['POST'])
+@api_bp.route('/subscriptions/<int:subscription_id>/pat', methods=['PUT', 'OPTIONS'])
+def update_subscription_pat(subscription_id):
+    if request.method == 'OPTIONS':
+        return '', 200
+    return subscription_controller.update_subscription_pat(subscription_id)
+
+@api_bp.route('/subscriptions/poll-all', methods=['POST', 'OPTIONS'])
 def trigger_all_polling():
+    if request.method == 'OPTIONS':
+        return '', 200
     return subscription_controller.trigger_all_polling()
 
 # PAT 관련 라우트

@@ -93,14 +93,20 @@ class SubscriptionService:
             ).first()
             
             if existing:
+                # 기존 구독 업데이트
                 existing.auto_test = auto_test
                 existing.slack_notify = slack_notify
                 # 기본값: main만 제외
                 existing.exclude_branches = exclude_branches if exclude_branches is not None else ['main']
                 existing.test_options = test_options or {}
-                existing.user_credential_id = credential_id
+                # PAT가 제공된 경우 credential_id 업데이트 (없던 경우 추가, 있던 경우 교체)
+                if credential_id is not None:
+                    existing.user_credential_id = credential_id
                 existing.updated_at = datetime.utcnow()
+                existing.is_active = True  # 혹시 비활성화되어 있었다면 다시 활성화
+                db.commit()
                 subscription_id = existing.id
+                print(f"  ✅ Updated existing subscription #{subscription_id} for {repo_full_name}")
             else:
                 repo_parts = repo_full_name.split('/')
                 if len(repo_parts) != 2:
@@ -124,12 +130,14 @@ class SubscriptionService:
                     last_polled_at=datetime.utcnow()
                 )
                 db.add(subscription)
+                db.commit()
                 subscription_id = subscription.id
+                print(f"  ✅ Created new subscription #{subscription_id} for {repo_full_name}")
             
-            db.commit()
             return {
                 'success': True,
-                'subscription_id': subscription_id
+                'subscription_id': subscription_id,
+                'has_pat': credential_id is not None
             }
         except Exception as e:
             db.rollback()
@@ -198,6 +206,71 @@ class SubscriptionService:
                 db.commit()
         except Exception as e:
             db.rollback()
+        finally:
+            db.close()
+    
+    def update_subscription_pat(self, subscription_id: int, user_id: str, pat: str) -> Dict:
+        """기존 구독에 PAT 추가/업데이트"""
+        # PAT 검증
+        verify_result = self.pat_auth.verify_pat(pat)
+        if not verify_result['valid']:
+            return {
+                'success': False,
+                'error': f"PAT verification failed: {verify_result.get('error')}"
+            }
+        
+        db = next(get_db())
+        try:
+            subscription = db.query(Subscription).filter(
+                Subscription.id == subscription_id,
+                Subscription.user_id == user_id,
+                Subscription.is_active == True
+            ).first()
+            
+            if not subscription:
+                return {
+                    'success': False,
+                    'error': 'Subscription not found'
+                }
+            
+            # 레포지토리 접근 권한 확인
+            access_result = self.pat_auth.check_repo_access(pat, subscription.repo_full_name)
+            if not access_result['accessible']:
+                return {
+                    'success': False,
+                    'error': f"Repository access denied: {access_result.get('error')}"
+                }
+            
+            # 인증 정보 저장/업데이트
+            try:
+                credential_id = self.pat_auth.save_credential(
+                    user_id=user_id,
+                    pat=pat,
+                    github_username=verify_result['username'],
+                    token_scopes=None
+                )
+                
+                # 구독에 PAT 연결
+                subscription.user_credential_id = credential_id
+                subscription.updated_at = datetime.utcnow()
+                db.commit()
+                
+                return {
+                    'success': True,
+                    'message': f'PAT added to subscription for {subscription.repo_full_name}'
+                }
+            except Exception as e:
+                db.rollback()
+                return {
+                    'success': False,
+                    'error': f"Failed to save PAT: {str(e)}"
+                }
+        except Exception as e:
+            db.rollback()
+            return {
+                'success': False,
+                'error': str(e)
+            }
         finally:
             db.close()
     

@@ -14,7 +14,9 @@ class Test(Base):
     id = Column(Integer, primary_key=True)
     subscription_id = Column(Integer, ForeignKey('subscriptions.id'), nullable=False)
     pr_number = Column(Integer, nullable=False)
+    pr_title = Column(String(511))  # PR 제목
     pr_url = Column(String(1023))
+    branch_name = Column(String(255))  # 브랜치 이름
     repo_full_name = Column(String(511))
     status = Column(String(50), default='pending')
     test_results = Column(JSON)

@@ -32,7 +32,11 @@ class PollingService:
                 print(f"❌ Error polling subscription {subscription.id}: {str(e)}")
     
     def _poll_subscription(self, subscription: Subscription):
-        """특정 구독에 대해 PR 확인"""
+        """특정 구독에 대해 PR 확인
+        
+        Returns:
+            tuple: (감지된 PR 개수, 감지된 PR 목록)
+        """
         print(f"  📦 Checking {subscription.repo_full_name}...")
         
         # PAT가 있는 경우 사용, 없으면 Public 저장소로 간주
@@ -54,10 +58,19 @@ class PollingService:
             repo = g.get_repo(subscription.repo_full_name)
             
             since = subscription.last_polled_at
+            # last_polled_at이 없으면 첫 polling이므로 모든 열린 PR을 확인 (30일 전까지)
             if not since:
-                since = datetime.utcnow() - timedelta(hours=1)
+                since = datetime.utcnow() - timedelta(days=30)
             
             pulls = repo.get_pulls(state='open', sort='updated', direction='desc')
+            
+            # PR 목록을 리스트로 변환 (제너레이터이므로)
+            pulls_list = list(pulls)
+            
+            print(f"    📋 Found {len(pulls_list)} open PR(s) in repository")
+            print(f"    📅 Last polled at: {subscription.last_polled_at}")
+            print(f"    📅 Since: {since}")
+            print(f"    🚫 Exclude branches: {subscription.exclude_branches or ['main']}")
             
             new_prs = []
             updated_prs = []
@@ -65,7 +78,22 @@ class PollingService:
             # 제외할 브랜치 목록 (기본값: main)
             exclude_branches = subscription.exclude_branches or ['main']
             
-            for pr in pulls:
+            # DB에서 이미 테스트가 있는 PR 목록 확인
+            db = next(get_db())
+            try:
+                existing_tests = db.query(Test).filter(
+                    Test.subscription_id == subscription.id
+                ).all()
+                tested_pr_numbers = {test.pr_number for test in existing_tests}
+            finally:
+                db.close()
+            
+            for pr in pulls_list:
+                pr_updated = pr.updated_at.replace(tzinfo=None) if pr.updated_at else None
+                pr_created = pr.created_at.replace(tzinfo=None) if pr.created_at else None
+                
+                print(f"    🔍 Checking PR #{pr.number}: {pr.title[:50]}... (branch: {pr.head.ref})")
+                
                 # 제외할 브랜치인지 확인
                 should_exclude = False
                 
@@ -83,17 +111,51 @@ class PollingService:
                 
                 # 제외할 브랜치면 스킵
                 if should_exclude:
+                    print(f"      ⏭️ Skipping PR #{pr.number} (excluded branch: {pr.head.ref})")
                     continue
                 
-                pr_updated = pr.updated_at.replace(tzinfo=None) if pr.updated_at else None
+                # 첫 polling이거나 PR이 since 이후에 생성/업데이트된 경우
+                is_first_polling = not subscription.last_polled_at
                 
-                if pr_updated and pr_updated > since:
-                    if pr.created_at and pr.created_at.replace(tzinfo=None) > since:
+                if is_first_polling:
+                    # 첫 polling: 모든 열린 PR을 새 PR로 처리
+                    if pr_created:
                         new_prs.append(pr)
+                        print(f"      ✅ Found PR #{pr.number} (first polling, branch: {pr.head.ref})")
+                else:
+                    # 이후 polling: since 이후 생성/업데이트된 PR 또는 테스트가 없는 PR
+                    has_test = pr.number in tested_pr_numbers
+                    
+                    if pr_updated and pr_updated > since:
+                        # PR이 since 이후에 업데이트됨
+                        if pr_created and pr_created > since:
+                            new_prs.append(pr)
+                            print(f"      ✅ Found new PR #{pr.number} (branch: {pr.head.ref}, created: {pr_created})")
+                        else:
+                            updated_prs.append(pr)
+                            print(f"      ✅ Found updated PR #{pr.number} (branch: {pr.head.ref}, updated: {pr_updated})")
+                    elif not has_test:
+                        # PR이 since 이전에 생성되었지만 테스트가 없는 경우
+                        new_prs.append(pr)
+                        print(f"      ✅ Found PR #{pr.number} (no test exists, branch: {pr.head.ref}, created: {pr_created})")
                     else:
-                        updated_prs.append(pr)
+                        print(f"      ⏭️ Skipping PR #{pr.number} (already tested, not updated since {since})")
             
             all_prs = new_prs + updated_prs
+            detected_count = len(all_prs)
+            
+            # 감지된 PR 정보 수집
+            detected_pr_list = []
+            for pr in all_prs:
+                detected_pr_list.append({
+                    'number': pr.number,
+                    'title': pr.title,
+                    'branch': pr.head.ref,
+                    'url': pr.html_url,
+                    'created_at': pr.created_at.isoformat() if pr.created_at else None,
+                    'updated_at': pr.updated_at.isoformat() if pr.updated_at else None
+                })
+            
             if all_prs:
                 print(f"    ✅ Found {len(all_prs)} PR(s) to test")
                 for pr in all_prs:
@@ -103,8 +165,19 @@ class PollingService:
             
             self.subscription_service.update_last_polled(subscription.id)
             
+            return detected_count, detected_pr_list
+            
         except Exception as e:
-            print(f"    ❌ Error fetching PRs: {str(e)}")
+            error_msg = str(e)
+            # Rate limit 에러 체크
+            if '403' in error_msg or 'rate limit' in error_msg.lower() or 'RateLimitExceededException' in str(type(e).__name__):
+                print(f"    ⚠️ Rate limit exceeded for {subscription.repo_full_name}")
+                print(f"    💡 Tip: Add a PAT to increase rate limit from 60/hour to 5,000/hour")
+                # Rate limit 에러를 명확하게 전달
+                raise Exception(f"GitHub API rate limit exceeded. Please add a Personal Access Token (PAT) to increase the limit from 60/hour to 5,000/hour. Error: {error_msg}")
+            else:
+                print(f"    ❌ Error fetching PRs: {str(e)}")
+                raise
     
     def _run_test_for_pr(self, pr, subscription: Subscription):
         """PR에 대해 테스트 실행"""
@@ -116,6 +189,7 @@ class PollingService:
         
         db = next(get_db())
         try:
+            # 이미 실행 중이거나 대기 중인 테스트가 있는지 확인
             recent_test = db.query(Test).filter(
                 Test.subscription_id == subscription.id,
                 Test.pr_number == pr_number,
@@ -123,13 +197,25 @@ class PollingService:
             ).first()
             
             if recent_test:
-                print(f"      ℹ️ Test already running or pending for PR #{pr_number}")
+                print(f"      ℹ️ Test already running or pending for PR #{pr_number}, skipping")
                 return
+            
+            # 완료된 테스트가 있는지 확인 (디버깅용)
+            completed_test = db.query(Test).filter(
+                Test.subscription_id == subscription.id,
+                Test.pr_number == pr_number,
+                Test.status.in_(['completed', 'failed'])
+            ).order_by(Test.created_at.desc()).first()
+            
+            if completed_test:
+                print(f"      ℹ️ Test already exists for PR #{pr_number} (status: {completed_test.status}), creating new test")
             
             test = Test(
                 subscription_id=subscription.id,
                 pr_number=pr_number,
+                pr_title=pr.title,
                 pr_url=pr.html_url,
+                branch_name=branch_name,
                 repo_full_name=repo_name,
                 status='pending'
             )

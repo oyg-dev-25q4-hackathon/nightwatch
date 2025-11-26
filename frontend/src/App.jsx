@@ -175,6 +175,25 @@ function Home() {
             return;
           }
           console.log("Public repo confirmed:", response.data.full_name);
+          // Public 저장소이지만 PAT 사용을 권장
+          if (!hasPAT) {
+            const usePAT = confirm(
+              "✅ Public 저장소입니다!\n\n" +
+                "💡 PAT를 사용하면 rate limit이 60회/시간 → 5,000회/시간으로 증가합니다.\n\n" +
+                "PAT를 추가하시겠습니까? (취소해도 PAT 없이 구독 가능합니다)"
+            );
+            if (usePAT) {
+              setLoading(false);
+              // PAT 입력 필드로 포커스 이동
+              setTimeout(() => {
+                const patInput = document.querySelector(
+                  'input[type="password"]'
+                );
+                if (patInput) patInput.focus();
+              }, 100);
+              return;
+            }
+          }
         } catch (error) {
           console.error("Repo check error:", error);
           if (error.response?.status === 404) {
@@ -183,7 +202,7 @@ function Home() {
             );
           } else if (error.response?.status === 403) {
             alert(
-              "GitHub API rate limit에 도달했습니다. 잠시 후 다시 시도해주세요."
+              "GitHub API rate limit에 도달했습니다. PAT를 추가하면 rate limit이 5,000회/시간으로 증가합니다."
             );
           } else {
             alert(`저장소 확인 중 오류가 발생했습니다: ${error.message}`);
@@ -212,7 +231,18 @@ function Home() {
       });
 
       if (response.data.success) {
-        alert("구독이 추가되었습니다!");
+        const hasPAT = response.data.has_pat !== false; // PAT가 제공되었는지 확인
+        if (hasPAT && formData.pat) {
+          alert(
+            "✅ 구독이 추가되었습니다!\n\n💡 PAT가 연결되어 rate limit이 5,000회/시간으로 설정되었습니다."
+          );
+        } else if (!formData.pat) {
+          alert(
+            "✅ 구독이 추가되었습니다!\n\n⚠️ PAT가 없어 rate limit이 60회/시간입니다.\n나중에 구독 상세 페이지에서 PAT를 추가할 수 있습니다."
+          );
+        } else {
+          alert("✅ 구독이 추가되었습니다!");
+        }
         setShowAddModal(false);
         setFormData({
           repo_full_name: "",
@@ -248,10 +278,29 @@ function Home() {
           fetchTests();
         }, 1000);
       } else {
-        alert(`오류: ${response.data.error}`);
+        const errorData = response.data || {};
+        if (errorData.error_type === "rate_limit") {
+          alert(
+            `⚠️ GitHub API Rate Limit 초과\n\n${errorData.error}\n\n💡 해결 방법: Personal Access Token (PAT)을 추가하면 rate limit이 60회/시간에서 5,000회/시간으로 증가합니다.`
+          );
+        } else {
+          alert(`오류: ${response.data.error}`);
+        }
       }
     } catch (error) {
-      alert(`오류: ${error.response?.data?.error || error.message}`);
+      const errorData = error.response?.data || {};
+      if (
+        errorData.error_type === "rate_limit" ||
+        error.response?.status === 429
+      ) {
+        alert(
+          `⚠️ GitHub API Rate Limit 초과\n\n${
+            errorData.error || error.message
+          }\n\n💡 해결 방법: Personal Access Token (PAT)을 추가하면 rate limit이 60회/시간에서 5,000회/시간으로 증가합니다.\n\n레포지토리 설정에서 PAT를 추가해주세요.`
+        );
+      } else {
+        alert(`오류: ${error.response?.data?.error || error.message}`);
+      }
     } finally {
       setPollingAll(false);
     }
@@ -522,8 +571,13 @@ function Home() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    Private 저장소는 PAT가 필요합니다. Public 저장소는 PAT
-                    없이도 구독할 수 있습니다.
+                    <span className="font-semibold text-blue-600">
+                      💡 권장:
+                    </span>{" "}
+                    Public 저장소도 PAT를 사용하면 rate limit이 60회/시간 →
+                    5,000회/시간으로 증가합니다.
+                    <br />
+                    Private 저장소는 PAT가 필수입니다.
                     <br />
                     GitHub → Settings → Developer settings → Personal access
                     tokens

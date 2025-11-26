@@ -149,16 +149,28 @@ class SubscriptionController:
             
             # 즉시 polling 실행
             try:
-                self.polling_service._poll_subscription(subscription)
+                detected_count, detected_pr_list = self.polling_service._poll_subscription(subscription)
                 return jsonify({
                     'success': True,
-                    'message': f'Polling completed for {subscription.repo_full_name}'
+                    'message': f'Polling completed for {subscription.repo_full_name}',
+                    'detected_prs': detected_count,
+                    'pr_list': detected_pr_list
                 }), 200
             except Exception as e:
-                return jsonify({
-                    'success': False,
-                    'error': f'Polling failed: {str(e)}'
-                }), 500
+                error_msg = str(e)
+                # Rate limit 에러인 경우 특별 처리
+                if 'rate limit' in error_msg.lower():
+                    return jsonify({
+                        'success': False,
+                        'error': error_msg,
+                        'error_type': 'rate_limit',
+                        'suggestion': 'Please add a Personal Access Token (PAT) to increase the rate limit from 60/hour to 5,000/hour'
+                    }), 429  # Too Many Requests
+                else:
+                    return jsonify({
+                        'success': False,
+                        'error': f'Polling failed: {error_msg}'
+                    }), 500
                 
         except Exception as e:
             return jsonify({
@@ -177,8 +189,49 @@ class SubscriptionController:
                 'message': 'Polling completed for all active subscriptions'
             }), 200
         except Exception as e:
+            error_msg = str(e)
+            # Rate limit 에러인 경우 특별 처리
+            if 'rate limit' in error_msg.lower():
+                return jsonify({
+                    'success': False,
+                    'error': error_msg,
+                    'error_type': 'rate_limit',
+                    'suggestion': 'Please add a Personal Access Token (PAT) to increase the rate limit from 60/hour to 5,000/hour'
+                }), 429  # Too Many Requests
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': f'Polling failed: {error_msg}'
+                }), 500
+    
+    def update_subscription_pat(self, subscription_id):
+        """기존 구독에 PAT 추가/업데이트"""
+        data = request.json
+        user_id = data.get('user_id', request.args.get('user_id', 'default'))
+        pat = data.get('pat')
+        
+        if not pat:
             return jsonify({
                 'success': False,
-                'error': f'Polling failed: {str(e)}'
+                'error': 'pat is required'
+            }), 400
+        
+        try:
+            result = self.service.update_subscription_pat(subscription_id, user_id, pat)
+            
+            if result['success']:
+                return jsonify({
+                    'success': True,
+                    'message': result['message']
+                }), 200
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': result.get('error', 'Unknown error')
+                }), 400
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
             }), 500
 

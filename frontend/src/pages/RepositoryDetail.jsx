@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
@@ -10,6 +10,9 @@ function RepositoryDetail() {
   const [subscription, setSubscription] = useState(null);
   const [prs, setPrs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showPATModal, setShowPATModal] = useState(false);
+  const [patInput, setPatInput] = useState("");
+  const [updatingPAT, setUpdatingPAT] = useState(false);
   const [polling, setPolling] = useState(false);
 
   useEffect(() => {
@@ -48,11 +51,16 @@ function RepositoryDetail() {
         const prMap = new Map();
         response.data.tests.forEach((test) => {
           const key = test.pr_number;
-          if (!prMap.has(key) || new Date(test.created_at) > new Date(prMap.get(key).created_at)) {
+          if (
+            !prMap.has(key) ||
+            new Date(test.created_at) > new Date(prMap.get(key).created_at)
+          ) {
             prMap.set(key, test);
           }
         });
-        setPrs(Array.from(prMap.values()).sort((a, b) => b.pr_number - a.pr_number));
+        setPrs(
+          Array.from(prMap.values()).sort((a, b) => b.pr_number - a.pr_number)
+        );
       }
     } catch (error) {
       console.error("PR 목록 조회 실패:", error);
@@ -71,29 +79,104 @@ function RepositoryDetail() {
           params: { user_id: "user123" },
         }
       );
-      
+
       if (response.data.success) {
-        alert("✅ PR 감지가 완료되었습니다!");
-        // PR 목록 새로고침
+        const detectedCount = response.data.detected_prs || 0;
+        const prList = response.data.pr_list || [];
+
+        if (detectedCount > 0) {
+          // 감지된 PR 목록을 상세하게 표시
+          let prListMessage = `✅ PR 감지가 완료되었습니다!\n\n${detectedCount}개의 PR이 감지되어 테스트가 시작되었습니다.\n\n`;
+          prList.forEach((pr, index) => {
+            prListMessage += `${index + 1}. PR #${pr.number}: ${
+              pr.title
+            }\n   브랜치: ${pr.branch}\n   URL: ${pr.url}\n\n`;
+          });
+          alert(prListMessage);
+        } else {
+          alert("✅ PR 감지가 완료되었습니다!\n\n새로운 PR이 없습니다.");
+        }
+        // PR 목록 즉시 새로고침
+        fetchPRs();
+        // DB 커밋 대기 후 다시 새로고침 (2초, 4초 후)
         setTimeout(() => {
           fetchPRs();
-        }, 1000);
+        }, 2000);
+        setTimeout(() => {
+          fetchPRs();
+        }, 4000);
+      } else {
+        const errorData = response.data || {};
+        if (errorData.error_type === "rate_limit") {
+          const addPAT = confirm(
+            `⚠️ GitHub API Rate Limit 초과\n\n${errorData.error}\n\n💡 해결 방법: Personal Access Token (PAT)을 추가하면 rate limit이 60회/시간에서 5,000회/시간으로 증가합니다.\n\n지금 PAT를 추가하시겠습니까?`
+          );
+          if (addPAT) {
+            setShowPATModal(true);
+          }
+        } else {
+          alert(`오류: ${response.data.error}`);
+        }
+      }
+    } catch (error) {
+      const errorData = error.response?.data || {};
+      if (
+        errorData.error_type === "rate_limit" ||
+        error.response?.status === 429
+      ) {
+        const addPAT = confirm(
+          `⚠️ GitHub API Rate Limit 초과\n\n${
+            errorData.error || error.message
+          }\n\n💡 해결 방법: Personal Access Token (PAT)을 추가하면 rate limit이 60회/시간에서 5,000회/시간으로 증가합니다.\n\n지금 PAT를 추가하시겠습니까?`
+        );
+        if (addPAT) {
+          setShowPATModal(true);
+        }
+      } else {
+        alert(`오류: ${error.response?.data?.error || error.message}`);
+      }
+    } finally {
+      setPolling(false);
+    }
+  };
+
+  const updatePAT = async () => {
+    if (!patInput.trim()) {
+      alert("PAT를 입력해주세요.");
+      return;
+    }
+
+    try {
+      setUpdatingPAT(true);
+      const response = await axios.put(
+        `${API_BASE_URL}/api/subscriptions/${subscriptionId}/pat`,
+        { pat: patInput.trim(), user_id: "user123" }
+      );
+
+      if (response.data.success) {
+        alert("✅ PAT가 성공적으로 추가되었습니다!");
+        setShowPATModal(false);
+        setPatInput("");
+        fetchSubscription(); // 구독 정보 새로고침
       } else {
         alert(`오류: ${response.data.error}`);
       }
     } catch (error) {
       alert(`오류: ${error.response?.data?.error || error.message}`);
     } finally {
-      setPolling(false);
+      setUpdatingPAT(false);
     }
   };
 
   const getStatusBadge = (status) => {
     const styles = {
-      completed: "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg",
+      completed:
+        "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg",
       failed: "bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg",
-      running: "bg-gradient-to-r from-yellow-400 to-orange-400 text-white shadow-lg animate-pulse",
-      pending: "bg-gradient-to-r from-gray-400 to-gray-500 text-white shadow-lg",
+      running:
+        "bg-gradient-to-r from-yellow-400 to-orange-400 text-white shadow-lg animate-pulse",
+      pending:
+        "bg-gradient-to-r from-gray-400 to-gray-500 text-white shadow-lg",
     };
     const labels = {
       completed: "✅ 완료",
@@ -103,7 +186,9 @@ function RepositoryDetail() {
     };
     return (
       <span
-        className={`px-4 py-1.5 text-xs font-bold rounded-full ${styles[status] || styles.pending}`}
+        className={`px-4 py-1.5 text-xs font-bold rounded-full ${
+          styles[status] || styles.pending
+        }`}
       >
         {labels[status] || "⏳ 대기"}
       </span>
@@ -124,7 +209,9 @@ function RepositoryDetail() {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center text-red-600">구독 정보를 찾을 수 없습니다.</div>
+          <div className="text-center text-red-600">
+            구독 정보를 찾을 수 없습니다.
+          </div>
         </div>
       </div>
     );
@@ -139,7 +226,9 @@ function RepositoryDetail() {
             onClick={() => navigate("/")}
             className="mb-6 text-blue-600 hover:text-blue-800 flex items-center gap-2 font-medium transition-colors group"
           >
-            <span className="group-hover:-translate-x-1 transition-transform">←</span>
+            <span className="group-hover:-translate-x-1 transition-transform">
+              ←
+            </span>
             <span>뒤로 가기</span>
           </button>
           <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl p-8 text-white">
@@ -160,14 +249,18 @@ function RepositoryDetail() {
                   <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
                     <p className="text-blue-100 text-xs mb-1">생성일</p>
                     <p className="text-white font-semibold">
-                      {new Date(subscription.created_at).toLocaleDateString("ko-KR")}
+                      {new Date(subscription.created_at).toLocaleDateString(
+                        "ko-KR"
+                      )}
                     </p>
                   </div>
                   {subscription.last_polled_at && (
                     <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
                       <p className="text-blue-100 text-xs mb-1">마지막 확인</p>
                       <p className="text-white font-semibold">
-                        {new Date(subscription.last_polled_at).toLocaleDateString("ko-KR")}
+                        {new Date(
+                          subscription.last_polled_at
+                        ).toLocaleDateString("ko-KR")}
                       </p>
                     </div>
                   )}
@@ -180,6 +273,24 @@ function RepositoryDetail() {
                     </div>
                   )}
                 </div>
+              </div>
+              <div className="mt-4">
+                {subscription.user_credential_id ? (
+                  <div className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold shadow-lg flex items-center gap-2">
+                    <span>✅</span>
+                    <span>
+                      PAT가 연결되어 있습니다 (Rate Limit: 5,000회/시간)
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowPATModal(true)}
+                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
+                  >
+                    <span>🔑</span>
+                    <span>PAT 추가 (Rate Limit 증가)</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -243,7 +354,9 @@ function RepositoryDetail() {
               {prs.map((pr, index) => (
                 <div
                   key={pr.id}
-                  onClick={() => navigate(`/subscriptions/${subscriptionId}/prs/${pr.id}`)}
+                  onClick={() =>
+                    navigate(`/subscriptions/${subscriptionId}/prs/${pr.id}`)
+                  }
                   className="p-6 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 cursor-pointer transition-all duration-200 group"
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
@@ -256,24 +369,17 @@ function RepositoryDetail() {
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-1">
                             <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                              Pull Request #{pr.pr_number}
+                              {pr.pr_title || `PR #${pr.pr_number}`}
                             </h3>
-                            {getStatusBadge(pr.status)}
+                            {pr.status === "completed" &&
+                              getStatusBadge(pr.status)}
                           </div>
-                          <p className="text-sm text-gray-600 font-medium">{pr.repo_full_name}</p>
+                          {pr.branch_name && (
+                            <p className="text-sm text-gray-600 font-medium">
+                              🌿 {pr.branch_name}
+                            </p>
+                          )}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-6 text-xs text-gray-500 ml-16">
-                        <div className="flex items-center gap-1">
-                          <span>📅</span>
-                          <span>생성: {new Date(pr.created_at).toLocaleString("ko-KR")}</span>
-                        </div>
-                        {pr.completed_at && (
-                          <div className="flex items-center gap-1">
-                            <span>✅</span>
-                            <span>완료: {new Date(pr.completed_at).toLocaleString("ko-KR")}</span>
-                          </div>
-                        )}
                       </div>
                     </div>
                     <div className="ml-4 text-blue-600 group-hover:translate-x-1 transition-transform text-2xl">
@@ -286,9 +392,69 @@ function RepositoryDetail() {
           )}
         </div>
       </div>
+
+      {/* PAT 추가 모달 */}
+      {showPATModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">PAT 추가</h2>
+              <button
+                onClick={() => {
+                  setShowPATModal(false);
+                  setPatInput("");
+                }}
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Personal Access Token
+                </label>
+                <input
+                  type="password"
+                  value={patInput}
+                  onChange={(e) => setPatInput(e.target.value)}
+                  placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      updatePAT();
+                    }
+                  }}
+                />
+                <p className="mt-2 text-xs text-gray-500">
+                  PAT를 추가하면 rate limit이 60회/시간 → 5,000회/시간으로
+                  증가합니다.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowPATModal(false);
+                    setPatInput("");
+                  }}
+                  className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={updatePAT}
+                  disabled={updatingPAT || !patInput.trim()}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {updatingPAT ? "추가 중..." : "PAT 추가"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default RepositoryDetail;
-

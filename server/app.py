@@ -11,7 +11,13 @@ from .models import init_db
 def create_app():
     """Flask 앱 생성"""
     app = Flask(__name__)
-    CORS(app)  # CORS 활성화
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"]
+        }
+    })  # CORS 활성화
     
     # 데이터베이스 초기화
     init_db()
