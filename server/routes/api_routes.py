@@ -32,6 +32,14 @@ def get_subscription(subscription_id):
 def delete_subscription(subscription_id):
     return subscription_controller.delete_subscription(subscription_id)
 
+@api_bp.route('/subscriptions/<int:subscription_id>/poll', methods=['POST'])
+def trigger_polling(subscription_id):
+    return subscription_controller.trigger_polling(subscription_id)
+
+@api_bp.route('/subscriptions/poll-all', methods=['POST'])
+def trigger_all_polling():
+    return subscription_controller.trigger_all_polling()
+
 # PAT 관련 라우트
 @api_bp.route('/pat/verify', methods=['POST'])
 def verify_pat():

@@ -10,6 +10,7 @@ function RepositoryDetail() {
   const [subscription, setSubscription] = useState(null);
   const [prs, setPrs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [polling, setPolling] = useState(false);
 
   useEffect(() => {
     fetchSubscription();
@@ -57,6 +58,33 @@ function RepositoryDetail() {
       console.error("PR 목록 조회 실패:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const triggerPolling = async () => {
+    try {
+      setPolling(true);
+      const response = await axios.post(
+        `${API_BASE_URL}/api/subscriptions/${subscriptionId}/poll`,
+        {},
+        {
+          params: { user_id: "user123" },
+        }
+      );
+      
+      if (response.data.success) {
+        alert("✅ PR 감지가 완료되었습니다!");
+        // PR 목록 새로고침
+        setTimeout(() => {
+          fetchPRs();
+        }, 1000);
+      } else {
+        alert(`오류: ${response.data.error}`);
+      }
+    } catch (error) {
+      alert(`오류: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setPolling(false);
     }
   };
 
@@ -174,6 +202,23 @@ function RepositoryDetail() {
                   </p>
                 </div>
               </div>
+              <button
+                onClick={triggerPolling}
+                disabled={polling}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transform hover:-translate-y-0.5"
+              >
+                {polling ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>감지 중...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xl">🚀</span>
+                    <span>지금 감지하기</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
           {loading ? (

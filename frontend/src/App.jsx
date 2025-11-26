@@ -14,6 +14,7 @@ function Home() {
   const [tests, setTests] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pollingAll, setPollingAll] = useState(false);
   const [userId] = useState("user123"); // 실제로는 인증에서 가져옴
 
   // 폼 상태
@@ -231,6 +232,31 @@ function Home() {
     }
   };
 
+  // 전체 PR 감지 트리거
+  const triggerAllPolling = async () => {
+    try {
+      setPollingAll(true);
+      const response = await axios.post(
+        `${API_BASE_URL}/api/subscriptions/poll-all`
+      );
+
+      if (response.data.success) {
+        alert("✅ 모든 레포지토리에서 PR 감지가 완료되었습니다!");
+        // 목록 새로고침
+        setTimeout(() => {
+          fetchSubscriptions();
+          fetchTests();
+        }, 1000);
+      } else {
+        alert(`오류: ${response.data.error}`);
+      }
+    } catch (error) {
+      alert(`오류: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setPollingAll(false);
+    }
+  };
+
   // 구독 삭제
   const handleDeleteSubscription = async (id) => {
     if (!confirm("정말 구독을 해제하시겠습니까?")) return;
@@ -263,12 +289,31 @@ function Home() {
                 NightWatch
               </h1>
             </div>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-            >
-              + 레포지토리 추가
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={triggerAllPolling}
+                disabled={pollingAll}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {pollingAll ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>감지 중...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🚀</span>
+                    <span>전체 감지</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                + 레포지토리 추가
+              </button>
+            </div>
           </div>
         </div>
       </header>

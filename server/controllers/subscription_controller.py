@@ -4,12 +4,15 @@
 """
 from flask import request, jsonify
 from ..services.subscription_service import SubscriptionService
+from ..services.polling_service import PollingService
+from ..models import Subscription, get_db
 
 class SubscriptionController:
     """구독 관리 컨트롤러"""
     
     def __init__(self):
         self.service = SubscriptionService()
+        self.polling_service = PollingService()
     
     def get_subscriptions(self):
         """구독 목록 조회"""
@@ -123,5 +126,59 @@ class SubscriptionController:
             return jsonify({
                 'success': False,
                 'error': str(e)
+            }), 500
+    
+    def trigger_polling(self, subscription_id):
+        """특정 구독에 대해 즉시 PR 감지 실행"""
+        user_id = request.args.get('user_id', 'default')
+        
+        db = next(get_db())
+        try:
+            # 구독 정보 확인
+            subscription = db.query(Subscription).filter(
+                Subscription.id == subscription_id,
+                Subscription.user_id == user_id,
+                Subscription.is_active == True
+            ).first()
+            
+            if not subscription:
+                return jsonify({
+                    'success': False,
+                    'error': 'Subscription not found or inactive'
+                }), 404
+            
+            # 즉시 polling 실행
+            try:
+                self.polling_service._poll_subscription(subscription)
+                return jsonify({
+                    'success': True,
+                    'message': f'Polling completed for {subscription.repo_full_name}'
+                }), 200
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': f'Polling failed: {str(e)}'
+                }), 500
+                
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+        finally:
+            db.close()
+    
+    def trigger_all_polling(self):
+        """모든 활성 구독에 대해 즉시 PR 감지 실행"""
+        try:
+            self.polling_service.poll_all_subscriptions()
+            return jsonify({
+                'success': True,
+                'message': 'Polling completed for all active subscriptions'
+            }), 200
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'Polling failed: {str(e)}'
             }), 500
 
