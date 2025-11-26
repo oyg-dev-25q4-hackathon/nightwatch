@@ -35,18 +35,22 @@ class PollingService:
         """특정 구독에 대해 PR 확인"""
         print(f"  📦 Checking {subscription.repo_full_name}...")
         
-        credential = self.pat_auth.get_credential_by_id(subscription.user_credential_id)
-        if not credential:
-            print(f"    ⚠️ No credential found for subscription {subscription.id}")
-            return
-        
-        pat = self.pat_auth.get_decrypted_pat(credential.user_id)
-        if not pat:
-            print(f"    ⚠️ Failed to decrypt PAT for subscription {subscription.id}")
-            return
+        # PAT가 있는 경우 사용, 없으면 Public 저장소로 간주
+        pat = None
+        if subscription.user_credential_id:
+            credential = self.pat_auth.get_credential_by_id(subscription.user_credential_id)
+            if credential:
+                pat = self.pat_auth.get_decrypted_pat(credential.user_id)
         
         try:
-            g = Github(pat)
+            # PAT가 있으면 사용, 없으면 None으로 Public 저장소 접근
+            if pat:
+                g = Github(pat)
+            else:
+                # Public 저장소는 PAT 없이 접근 가능
+                g = Github()
+                print(f"    ℹ️ Using public API access (no PAT)")
+            
             repo = g.get_repo(subscription.repo_full_name)
             
             since = subscription.last_polled_at
@@ -58,14 +62,28 @@ class PollingService:
             new_prs = []
             updated_prs = []
             
+            # 제외할 브랜치 목록 (기본값: main)
+            exclude_branches = subscription.exclude_branches or ['main']
+            
             for pr in pulls:
-                if subscription.target_branches:
-                    if not any(
-                        pr.head.ref.startswith(branch.replace('*', '')) 
-                        for branch in subscription.target_branches
-                        if branch.endswith('*')
-                    ) and pr.head.ref not in subscription.target_branches:
-                        continue
+                # 제외할 브랜치인지 확인
+                should_exclude = False
+                
+                for exclude_branch in exclude_branches:
+                    # 와일드카드 패턴 지원 (예: "main*" -> "main", "main-dev" 등)
+                    if exclude_branch.endswith('*'):
+                        pattern = exclude_branch.replace('*', '')
+                        if pr.head.ref.startswith(pattern):
+                            should_exclude = True
+                            break
+                    # 정확한 매칭
+                    elif pr.head.ref == exclude_branch:
+                        should_exclude = True
+                        break
+                
+                # 제외할 브랜치면 스킵
+                if should_exclude:
+                    continue
                 
                 pr_updated = pr.updated_at.replace(tzinfo=None) if pr.updated_at else None
                 

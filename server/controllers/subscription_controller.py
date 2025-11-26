@@ -33,20 +33,24 @@ class SubscriptionController:
         
         user_id = data.get('user_id', 'default')
         repo_full_name = data.get('repo_full_name')
-        pat = data.get('pat')
+        pat = data.get('pat')  # Optional: Public 저장소는 PAT 불필요
         auto_test = data.get('auto_test', True)
         slack_notify = data.get('slack_notify', True)
-        target_branches = data.get('target_branches')
+        exclude_branches = data.get('exclude_branches')  # 제외할 브랜치 목록
         test_options = data.get('test_options', {})
         
-        if not repo_full_name or not pat:
+        if not repo_full_name:
             return jsonify({
                 'success': False,
-                'error': 'repo_full_name and pat are required'
+                'error': 'repo_full_name is required'
             }), 400
         
         try:
-            target_branches_list = target_branches.split(',') if isinstance(target_branches, str) else target_branches
+            # 제외할 브랜치 목록 처리 (기본값: ['main'])
+            exclude_branches_list = None
+            if exclude_branches:
+                exclude_branches_list = exclude_branches.split(',') if isinstance(exclude_branches, str) else exclude_branches
+                exclude_branches_list = [b.strip() for b in exclude_branches_list if b.strip()]
             
             result = self.service.create_subscription(
                 user_id=user_id,
@@ -54,7 +58,7 @@ class SubscriptionController:
                 pat=pat,
                 auto_test=auto_test,
                 slack_notify=slack_notify,
-                target_branches=target_branches_list,
+                exclude_branches=exclude_branches_list,
                 test_options=test_options
             )
             

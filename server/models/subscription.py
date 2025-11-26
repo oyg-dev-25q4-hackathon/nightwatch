@@ -13,13 +13,13 @@ class Subscription(Base):
     
     id = Column(Integer, primary_key=True)
     user_id = Column(String(255), nullable=False, index=True)
-    user_credential_id = Column(Integer, ForeignKey('user_credentials.id'), nullable=False)
+    user_credential_id = Column(Integer, ForeignKey('user_credentials.id'), nullable=True)  # Public 저장소는 PAT 불필요
     repo_owner = Column(String(255), nullable=False)
     repo_name = Column(String(255), nullable=False)
     repo_full_name = Column(String(511), nullable=False, index=True)
     auto_test = Column(Boolean, default=True)
     slack_notify = Column(Boolean, default=True)
-    target_branches = Column(JSON)
+    exclude_branches = Column(JSON)  # 제외할 브랜치 목록 (기본값: ['main'])
     test_options = Column(JSON)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)

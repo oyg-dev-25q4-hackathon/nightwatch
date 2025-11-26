@@ -70,7 +70,8 @@ class PATAuthService:
                 repo_info = response.json()
                 return {
                     'accessible': True,
-                    'repo_info': repo_info
+                    'repo_info': repo_info,
+                    'is_public': not repo_info.get('private', True)
                 }
             elif response.status_code == 404:
                 return {
@@ -85,6 +86,46 @@ class PATAuthService:
         except Exception as e:
             return {
                 'accessible': False,
+                'error': str(e)
+            }
+    
+    def check_repo_public(self, repo_full_name: str) -> Dict:
+        """Public 저장소인지 확인 (PAT 없이)"""
+        try:
+            headers = {
+                'Accept': 'application/vnd.github.v3+json'
+            }
+            
+            response = requests.get(
+                f'{self.github_base_url}/repos/{repo_full_name}',
+                headers=headers,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                repo_info = response.json()
+                is_public = not repo_info.get('private', True)
+                return {
+                    'exists': True,
+                    'is_public': is_public,
+                    'repo_info': repo_info if is_public else None
+                }
+            elif response.status_code == 404:
+                return {
+                    'exists': False,
+                    'is_public': False,
+                    'error': 'Repository not found'
+                }
+            else:
+                return {
+                    'exists': False,
+                    'is_public': False,
+                    'error': f'GitHub API error: {response.status_code}'
+                }
+        except Exception as e:
+            return {
+                'exists': False,
+                'is_public': False,
                 'error': str(e)
             }
     

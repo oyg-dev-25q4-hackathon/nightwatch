@@ -1,164 +1,250 @@
-import { useState, useEffect } from 'react'
-import axios from 'axios'
-import './App.css'
+import axios from "axios";
+import { useEffect, useState } from "react";
+import "./App.css";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 function App() {
-  const [subscriptions, setSubscriptions] = useState([])
-  const [tests, setTests] = useState([])
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [userId] = useState('user123') // 실제로는 인증에서 가져옴
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [tests, setTests] = useState([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [userId] = useState("user123"); // 실제로는 인증에서 가져옴
 
   // 폼 상태
   const [formData, setFormData] = useState({
-    repo_full_name: '',
-    pat: '',
+    repo_full_name: "",
+    pat: "",
     auto_test: true,
     slack_notify: true,
-    target_branches: ''
-  })
+    exclude_branches: "main", // 기본값: main만 제외
+  });
 
   // 구독 목록 조회
   const fetchSubscriptions = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/subscriptions`, {
-        params: { user_id: userId }
-      })
+        params: { user_id: userId },
+      });
       if (response.data.success) {
-        setSubscriptions(response.data.subscriptions)
+        setSubscriptions(response.data.subscriptions);
       }
     } catch (error) {
-      console.error('구독 목록 조회 실패:', error)
+      console.error("구독 목록 조회 실패:", error);
     }
-  }
+  };
 
   // 테스트 기록 조회
   const fetchTests = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/tests`, {
-        params: { user_id: userId, limit: 20 }
-      })
+        params: { user_id: userId, limit: 20 },
+      });
       if (response.data.success) {
-        setTests(response.data.tests)
+        setTests(response.data.tests);
       }
     } catch (error) {
-      console.error('테스트 기록 조회 실패:', error)
+      console.error("테스트 기록 조회 실패:", error);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchSubscriptions()
-    fetchTests()
-    
+    fetchSubscriptions();
+    fetchTests();
+
     // 주기적으로 갱신
     const interval = setInterval(() => {
-      fetchSubscriptions()
-      fetchTests()
-    }, 30000) // 30초마다
+      fetchSubscriptions();
+      fetchTests();
+    }, 30000); // 30초마다
 
-    return () => clearInterval(interval)
-  }, [])
+    return () => clearInterval(interval);
+  }, []);
 
   // PAT 검증
   const verifyPAT = async (pat) => {
     try {
       const response = await axios.post(`${API_BASE_URL}/api/pat/verify`, {
-        pat: pat
-      })
-      return response.data
+        pat: pat,
+      });
+      return response.data;
     } catch (error) {
-      return { success: false, error: error.response?.data?.error || '검증 실패' }
+      return {
+        success: false,
+        error: error.response?.data?.error || "검증 실패",
+      };
     }
-  }
+  };
 
   // 레포지토리 접근 확인
   const checkRepoAccess = async (pat, repoFullName) => {
     try {
       const response = await axios.post(`${API_BASE_URL}/api/pat/check-repo`, {
         pat: pat,
-        repo_full_name: repoFullName
-      })
-      return response.data
+        repo_full_name: repoFullName,
+      });
+      return response.data;
     } catch (error) {
-      return { success: false, error: error.response?.data?.error || '접근 확인 실패' }
+      return {
+        success: false,
+        error: error.response?.data?.error || "접근 확인 실패",
+      };
     }
-  }
+  };
+
+  // GitHub URL을 owner/repo 형식으로 변환
+  const normalizeRepoName = (repoInput) => {
+    if (!repoInput) return "";
+
+    let normalized = repoInput.trim();
+
+    // 앞뒤 슬래시 제거
+    normalized = normalized.replace(/^\/+|\/+$/g, "");
+
+    // https://github.com/owner/repo 형식인 경우
+    const githubUrlPattern = /github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
+    const match = normalized.match(githubUrlPattern);
+    if (match) {
+      return `${match[1]}/${match[2]}`;
+    }
+
+    // 이미 owner/repo 형식인 경우 (앞뒤 슬래시 제거 후)
+    if (normalized.includes("/") && !normalized.includes("http")) {
+      return normalized;
+    }
+
+    return normalized;
+  };
 
   // 구독 추가
   const handleAddSubscription = async (e) => {
-    e.preventDefault()
-    setLoading(true)
+    e.preventDefault();
+    setLoading(true);
 
     try {
-      // 1. PAT 검증
-      const verifyResult = await verifyPAT(formData.pat)
-      if (!verifyResult.success) {
-        alert(`PAT 검증 실패: ${verifyResult.error}`)
-        setLoading(false)
-        return
+      // 레포지토리 이름 정규화
+      const normalizedRepoName = normalizeRepoName(formData.repo_full_name);
+      if (!normalizedRepoName || !normalizedRepoName.includes("/")) {
+        alert(
+          "올바른 레포지토리 형식을 입력해주세요.\n예: owner/repo-name 또는 https://github.com/owner/repo"
+        );
+        setLoading(false);
+        return;
       }
 
-      // 2. 레포지토리 접근 확인
-      const accessResult = await checkRepoAccess(formData.pat, formData.repo_full_name)
-      if (!accessResult.success) {
-        alert(`레포지토리 접근 불가: ${accessResult.error}`)
-        setLoading(false)
-        return
+      const hasPAT = formData.pat && formData.pat.trim() !== "";
+
+      // PAT가 제공된 경우에만 검증
+      if (hasPAT) {
+        // 1. PAT 검증
+        const verifyResult = await verifyPAT(formData.pat);
+        if (!verifyResult.success) {
+          alert(`PAT 검증 실패: ${verifyResult.error}`);
+          setLoading(false);
+          return;
+        }
+
+        // 2. 레포지토리 접근 확인
+        const accessResult = await checkRepoAccess(
+          formData.pat,
+          normalizedRepoName
+        );
+        if (!accessResult.success) {
+          alert(`레포지토리 접근 불가: ${accessResult.error}`);
+          setLoading(false);
+          return;
+        }
+      } else {
+        // PAT가 없는 경우: Public 저장소인지 확인
+        try {
+          console.log("Checking public repo:", normalizedRepoName);
+          const response = await axios.get(
+            `https://api.github.com/repos/${normalizedRepoName}`
+          );
+          if (response.data.private) {
+            alert(
+              "Private 저장소는 PAT가 필요합니다. Personal Access Token을 입력해주세요."
+            );
+            setLoading(false);
+            return;
+          }
+          console.log("Public repo confirmed:", response.data.full_name);
+        } catch (error) {
+          console.error("Repo check error:", error);
+          if (error.response?.status === 404) {
+            alert(
+              `저장소를 찾을 수 없습니다.\n입력한 이름: ${formData.repo_full_name}\n정규화된 이름: ${normalizedRepoName}\n\n저장소 이름을 확인해주세요.`
+            );
+          } else if (error.response?.status === 403) {
+            alert(
+              "GitHub API rate limit에 도달했습니다. 잠시 후 다시 시도해주세요."
+            );
+          } else {
+            alert(`저장소 확인 중 오류가 발생했습니다: ${error.message}`);
+          }
+          setLoading(false);
+          return;
+        }
       }
 
       // 3. 구독 추가
-      const targetBranches = formData.target_branches
-        ? formData.target_branches.split(',').map(b => b.trim()).filter(Boolean)
-        : null
+      // 제외할 브랜치 목록 처리 (기본값: main)
+      const excludeBranches = formData.exclude_branches
+        ? formData.exclude_branches
+            .split(",")
+            .map((b) => b.trim())
+            .filter(Boolean)
+        : ["main"]; // 기본값: main만 제외
 
       const response = await axios.post(`${API_BASE_URL}/api/subscriptions`, {
         user_id: userId,
-        repo_full_name: formData.repo_full_name,
-        pat: formData.pat,
+        repo_full_name: normalizedRepoName, // 정규화된 레포지토리 이름 사용
+        pat: hasPAT ? formData.pat : null, // PAT가 없으면 null
         auto_test: formData.auto_test,
         slack_notify: formData.slack_notify,
-        target_branches: targetBranches
-      })
+        exclude_branches: excludeBranches,
+      });
 
       if (response.data.success) {
-        alert('구독이 추가되었습니다!')
-        setShowAddModal(false)
+        alert("구독이 추가되었습니다!");
+        setShowAddModal(false);
         setFormData({
-          repo_full_name: '',
-          pat: '',
+          repo_full_name: "",
+          pat: "",
           auto_test: true,
           slack_notify: true,
-          target_branches: ''
-        })
-        fetchSubscriptions()
+          exclude_branches: "main",
+        });
+        fetchSubscriptions();
       } else {
-        alert(`구독 추가 실패: ${response.data.error}`)
+        alert(`구독 추가 실패: ${response.data.error}`);
       }
     } catch (error) {
-      alert(`오류: ${error.response?.data?.error || error.message}`)
+      alert(`오류: ${error.response?.data?.error || error.message}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // 구독 삭제
   const handleDeleteSubscription = async (id) => {
-    if (!confirm('정말 구독을 해제하시겠습니까?')) return
+    if (!confirm("정말 구독을 해제하시겠습니까?")) return;
 
     try {
-      const response = await axios.delete(`${API_BASE_URL}/api/subscriptions/${id}`, {
-        params: { user_id: userId }
-      })
+      const response = await axios.delete(
+        `${API_BASE_URL}/api/subscriptions/${id}`,
+        {
+          params: { user_id: userId },
+        }
+      );
       if (response.data.success) {
-        alert('구독이 해제되었습니다.')
-        fetchSubscriptions()
+        alert("구독이 해제되었습니다.");
+        fetchSubscriptions();
       }
     } catch (error) {
-      alert(`구독 해제 실패: ${error.response?.data?.error || error.message}`)
+      alert(`구독 해제 실패: ${error.response?.data?.error || error.message}`);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -168,7 +254,9 @@ function App() {
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <span className="text-2xl">🌙</span>
-              <h1 className="ml-2 text-2xl font-bold text-gray-900">NightWatch</h1>
+              <h1 className="ml-2 text-2xl font-bold text-gray-900">
+                NightWatch
+              </h1>
             </div>
             <button
               onClick={() => setShowAddModal(true)}
@@ -184,7 +272,9 @@ function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 구독 목록 */}
         <section className="mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">구독 중인 레포지토리</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            구독 중인 레포지토리
+          </h2>
           {subscriptions.length === 0 ? (
             <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
               구독 중인 레포지토리가 없습니다. 레포지토리를 추가해주세요.
@@ -206,12 +296,20 @@ function App() {
                         )}
                       </div>
                       <div className="text-sm text-gray-600 space-y-1">
-                        <p>생성일: {new Date(sub.created_at).toLocaleString('ko-KR')}</p>
+                        <p>
+                          생성일:{" "}
+                          {new Date(sub.created_at).toLocaleString("ko-KR")}
+                        </p>
                         {sub.last_polled_at && (
-                          <p>마지막 확인: {new Date(sub.last_polled_at).toLocaleString('ko-KR')}</p>
+                          <p>
+                            마지막 확인:{" "}
+                            {new Date(sub.last_polled_at).toLocaleString(
+                              "ko-KR"
+                            )}
+                          </p>
                         )}
-                        {sub.target_branches && (
-                          <p>브랜치 필터: {sub.target_branches.join(', ')}</p>
+                        {sub.exclude_branches && (
+                          <p>제외 브랜치: {sub.exclude_branches.join(", ")}</p>
                         )}
                       </div>
                     </div>
@@ -230,7 +328,9 @@ function App() {
 
         {/* 테스트 기록 */}
         <section>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">최근 테스트 기록</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            최근 테스트 기록
+          </h2>
           {tests.length === 0 ? (
             <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
               테스트 기록이 없습니다.
@@ -276,28 +376,28 @@ function App() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-2 py-1 text-xs font-medium rounded ${
-                            test.status === 'completed'
-                              ? 'bg-green-100 text-green-800'
-                              : test.status === 'failed'
-                              ? 'bg-red-100 text-red-800'
-                              : test.status === 'running'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-gray-100 text-gray-800'
+                            test.status === "completed"
+                              ? "bg-green-100 text-green-800"
+                              : test.status === "failed"
+                              ? "bg-red-100 text-red-800"
+                              : test.status === "running"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-gray-100 text-gray-800"
                           }`}
                         >
-                          {test.status === 'completed' && '✅ 완료'}
-                          {test.status === 'failed' && '❌ 실패'}
-                          {test.status === 'running' && '🔄 실행 중'}
-                          {test.status === 'pending' && '⏳ 대기'}
+                          {test.status === "completed" && "✅ 완료"}
+                          {test.status === "failed" && "❌ 실패"}
+                          {test.status === "running" && "🔄 실행 중"}
+                          {test.status === "pending" && "⏳ 대기"}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(test.created_at).toLocaleString('ko-KR')}
+                        {new Date(test.created_at).toLocaleString("ko-KR")}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {test.completed_at
-                          ? new Date(test.completed_at).toLocaleString('ko-KR')
-                          : '-'}
+                          ? new Date(test.completed_at).toLocaleString("ko-KR")
+                          : "-"}
                       </td>
                     </tr>
                   ))}
@@ -314,7 +414,9 @@ function App() {
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">레포지토리 구독 추가</h2>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  레포지토리 구독 추가
+                </h2>
                 <button
                   onClick={() => setShowAddModal(false)}
                   className="text-gray-400 hover:text-gray-600"
@@ -331,47 +433,66 @@ function App() {
                   <input
                     type="text"
                     required
-                    placeholder="owner/repo-name (예: company/frontend-repo)"
+                    placeholder="owner/repo-name 또는 https://github.com/owner/repo"
                     value={formData.repo_full_name}
                     onChange={(e) =>
-                      setFormData({ ...formData, repo_full_name: e.target.value })
+                      setFormData({
+                        ...formData,
+                        repo_full_name: e.target.value,
+                      })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Personal Access Token (PAT)
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                    value={formData.pat}
-                    onChange={(e) => setFormData({ ...formData, pat: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
                   <p className="mt-1 text-xs text-gray-500">
-                    GitHub → Settings → Developer settings → Personal access tokens
+                    형식: owner/repo-name 또는 https://github.com/owner/repo
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    브랜치 필터 (선택사항)
+                    Personal Access Token (PAT)
+                    <span className="text-gray-500 text-xs ml-2">
+                      (Public 저장소는 선택사항)
+                    </span>
                   </label>
                   <input
-                    type="text"
-                    placeholder="feature/*, develop (쉼표로 구분)"
-                    value={formData.target_branches}
+                    type="password"
+                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx (Public 저장소는 비워두세요)"
+                    value={formData.pat}
                     onChange={(e) =>
-                      setFormData({ ...formData, target_branches: e.target.value })
+                      setFormData({ ...formData, pat: e.target.value })
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                   <p className="mt-1 text-xs text-gray-500">
-                    특정 브랜치만 테스트하려면 입력 (비워두면 모든 브랜치)
+                    Private 저장소는 PAT가 필요합니다. Public 저장소는 PAT
+                    없이도 구독할 수 있습니다.
+                    <br />
+                    GitHub → Settings → Developer settings → Personal access
+                    tokens
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    제외할 브랜치 (선택사항)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="main (기본값, 쉼표로 구분)"
+                    value={formData.exclude_branches}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        exclude_branches: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    이 브랜치들의 PR은 감지하지 않습니다. 기본값: main
+                    <br />
+                    와일드카드 지원: main* (main으로 시작하는 모든 브랜치 제외)
                   </p>
                 </div>
 
@@ -381,22 +502,32 @@ function App() {
                       type="checkbox"
                       checked={formData.auto_test}
                       onChange={(e) =>
-                        setFormData({ ...formData, auto_test: e.target.checked })
+                        setFormData({
+                          ...formData,
+                          auto_test: e.target.checked,
+                        })
                       }
                       className="mr-2"
                     />
-                    <span className="text-sm text-gray-700">자동 테스트 실행</span>
+                    <span className="text-sm text-gray-700">
+                      자동 테스트 실행
+                    </span>
                   </label>
                   <label className="flex items-center">
                     <input
                       type="checkbox"
                       checked={formData.slack_notify}
                       onChange={(e) =>
-                        setFormData({ ...formData, slack_notify: e.target.checked })
+                        setFormData({
+                          ...formData,
+                          slack_notify: e.target.checked,
+                        })
                       }
                       className="mr-2"
                     />
-                    <span className="text-sm text-gray-700">Slack 알림 전송</span>
+                    <span className="text-sm text-gray-700">
+                      Slack 알림 전송
+                    </span>
                   </label>
                 </div>
 
@@ -413,7 +544,7 @@ function App() {
                     disabled={loading}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {loading ? '처리 중...' : '구독 추가'}
+                    {loading ? "처리 중..." : "구독 추가"}
                   </button>
                 </div>
               </form>
@@ -422,7 +553,7 @@ function App() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
