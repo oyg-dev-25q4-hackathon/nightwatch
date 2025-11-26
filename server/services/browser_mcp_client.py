@@ -1,4 +1,4 @@
-# src/browser_mcp_client.py
+# server/services/browser_mcp_client.py
 """
 Browser MCP 클라이언트
 MCP 서버와 통신하여 브라우저 자동화 기능을 제공

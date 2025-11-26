@@ -1,17 +1,17 @@
-# src/subscription_manager.py
+# server/services/subscription_service.py
 """
-레포지토리 구독 관리 모듈
+레포지토리 구독 관리 서비스
 """
-from typing import List, Dict, Optional
+from typing import List, Dict
 from datetime import datetime
-from .models import Subscription, get_db
-from .pat_auth import PATAuth
+from ..models import Subscription, get_db
+from .pat_auth_service import PATAuthService
 
-class SubscriptionManager:
-    """구독 관리 클래스"""
+class SubscriptionService:
+    """구독 관리 서비스"""
     
     def __init__(self):
-        self.pat_auth = PATAuth()
+        self.pat_auth = PATAuthService()
     
     def create_subscription(
         self,
@@ -23,25 +23,7 @@ class SubscriptionManager:
         target_branches: List[str] = None,
         test_options: Dict = None
     ) -> Dict:
-        """
-        레포지토리 구독 생성
-        
-        Args:
-            user_id: 사용자 식별자
-            repo_full_name: owner/repo 형식
-            pat: Personal Access Token
-            auto_test: 자동 테스트 실행 여부
-            slack_notify: Slack 알림 여부
-            target_branches: 특정 브랜치만 (None이면 모든 브랜치)
-            test_options: 테스트 옵션
-            
-        Returns:
-            {
-                'success': bool,
-                'subscription_id': int (if success),
-                'error': str (if failed)
-            }
-        """
+        """레포지토리 구독 생성"""
         # 1. PAT 검증
         verify_result = self.pat_auth.verify_pat(pat)
         if not verify_result['valid']:
@@ -64,7 +46,7 @@ class SubscriptionManager:
                 user_id=user_id,
                 pat=pat,
                 github_username=verify_result['username'],
-                token_scopes=None  # 필요시 추가
+                token_scopes=None
             )
         except Exception as e:
             return {
@@ -75,7 +57,6 @@ class SubscriptionManager:
         # 4. 구독 정보 저장
         db = next(get_db())
         try:
-            # 기존 구독 확인
             existing = db.query(Subscription).filter(
                 Subscription.user_id == user_id,
                 Subscription.repo_full_name == repo_full_name,
@@ -83,7 +64,6 @@ class SubscriptionManager:
             ).first()
             
             if existing:
-                # 기존 구독 업데이트
                 existing.auto_test = auto_test
                 existing.slack_notify = slack_notify
                 existing.target_branches = target_branches
@@ -92,7 +72,6 @@ class SubscriptionManager:
                 existing.updated_at = datetime.utcnow()
                 subscription_id = existing.id
             else:
-                # 새 구독 생성
                 repo_parts = repo_full_name.split('/')
                 if len(repo_parts) != 2:
                     return {
@@ -117,12 +96,10 @@ class SubscriptionManager:
                 subscription_id = subscription.id
             
             db.commit()
-            
             return {
                 'success': True,
                 'subscription_id': subscription_id
             }
-            
         except Exception as e:
             db.rollback()
             return {

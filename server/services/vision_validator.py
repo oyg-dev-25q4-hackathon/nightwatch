@@ -1,4 +1,4 @@
-# src/vision_validator.py
+# server/services/vision_validator.py
 import google.generativeai as genai
 import os
 import json

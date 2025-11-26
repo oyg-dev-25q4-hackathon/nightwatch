@@ -30,26 +30,48 @@ GitHub PR → Webhook → K8s 배포 (pr-123.global.oliveyoung.com)
 
 자세한 다이어그램은 [docs/diagrams.md](docs/diagrams.md)를 참고하세요.
 
-## 📁 프로젝트 구조
+## 📁 프로젝트 구조 (MVC 패턴)
 
 ```
-nightwatch/
-├── src/
-│   ├── __init__.py
-│   ├── webhook_server.py      # GitHub Webhook 수신 및 파이프라인 실행
-│   ├── k8s_deployer.py        # 쿠버네티스 배포 관리
-│   ├── pr_analyzer.py         # Gemini로 PR 분석 및 시나리오 생성
-│   ├── browser_mcp_client.py  # Browser MCP 클라이언트
-│   ├── browser_executor.py    # Browser MCP를 사용한 브라우저 자동화
-│   ├── vision_validator.py    # Gemini Vision으로 화면 검증
-│   └── slack_notifier.py      # 슬랙 알림
-├── videos/                     # 테스트 영상 저장
-├── screenshots/                # 스크린샷 저장
-├── reports/                    # 테스트 리포트
-├── requirements.txt
-├── .env
-└── main.py
+hackerton/
+├── server/                     # 백엔드 서버 (MVC 구조)
+│   ├── models/                # 데이터베이스 모델
+│   │   ├── database.py
+│   │   ├── user_credential.py
+│   │   ├── subscription.py
+│   │   └── test.py
+│   ├── services/              # 비즈니스 로직
+│   │   ├── pat_auth_service.py
+│   │   ├── subscription_service.py
+│   │   ├── polling_service.py
+│   │   ├── test_pipeline_service.py
+│   │   └── ...
+│   ├── controllers/           # 컨트롤러
+│   │   ├── subscription_controller.py
+│   │   ├── pat_controller.py
+│   │   └── test_controller.py
+│   ├── routes/                # 라우팅
+│   │   ├── api_routes.py
+│   │   └── webhook_routes.py
+│   ├── utils/                 # 유틸리티
+│   │   └── crypto.py
+│   ├── config/                # 설정
+│   └── app.py                 # Flask 앱
+│
+├── frontend/                  # React 프론트엔드
+│   └── src/
+│       └── App.jsx
+│
+├── output/                    # 테스트 결과 파일
+│   ├── videos/              # 테스트 영상
+│   ├── screenshots/          # 스크린샷
+│   └── reports/              # 테스트 리포트
+├── main.py                    # Webhook 방식 서버
+├── main_with_polling.py       # Polling 방식 서버
+└── requirements.txt
 ```
+
+자세한 구조는 [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)를 참고하세요.
 
 ## 🔑 주요 기능
 

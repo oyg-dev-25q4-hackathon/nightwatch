@@ -1,4 +1,4 @@
-# src/k8s_deployer.py
+# server/services/k8s_deployer.py
 import os
 import subprocess
 import time

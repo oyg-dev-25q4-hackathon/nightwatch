@@ -1,21 +1,17 @@
-# src/polling_scheduler.py
+# server/services/polling_scheduler.py
 """
-Polling 스케줄러 - 주기적으로 PR을 확인
+Polling 스케줄러
 """
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 import os
 from .polling_service import PollingService
-from .models import init_db
+from ..models import init_db
 
 class PollingScheduler:
     """Polling 스케줄러 클래스"""
     
     def __init__(self, interval_minutes: int = 5):
-        """
-        Args:
-            interval_minutes: Polling 간격 (분)
-        """
         self.interval_minutes = interval_minutes
         self.scheduler = BackgroundScheduler()
         self.polling_service = PollingService()
@@ -27,10 +23,8 @@ class PollingScheduler:
             print("⚠️ Scheduler is already running")
             return
         
-        # 데이터베이스 초기화
         init_db()
         
-        # Polling 작업 등록
         self.scheduler.add_job(
             func=self._poll_job,
             trigger=IntervalTrigger(minutes=self.interval_minutes),

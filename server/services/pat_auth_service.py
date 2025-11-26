@@ -1,33 +1,21 @@
-# src/pat_auth.py
+# server/services/pat_auth_service.py
 """
-Personal Access Token 인증 모듈
+Personal Access Token 인증 서비스
 """
 import requests
-from github import Github
 from typing import Dict, Optional
-from .crypto_utils import encrypt_pat, decrypt_pat
-from .models import UserCredential, get_db
+from datetime import datetime
+from ..models import UserCredential, get_db
+from ..utils.crypto import encrypt_pat, decrypt_pat
 
-class PATAuth:
-    """PAT 인증 및 관리 클래스"""
+class PATAuthService:
+    """PAT 인증 및 관리 서비스"""
     
     def __init__(self):
         self.github_base_url = "https://api.github.com"
     
     def verify_pat(self, pat: str) -> Dict:
-        """
-        PAT 유효성 검증
-        
-        Args:
-            pat: Personal Access Token
-            
-        Returns:
-            {
-                'valid': bool,
-                'username': str (if valid),
-                'error': str (if invalid)
-            }
-        """
+        """PAT 유효성 검증"""
         try:
             headers = {
                 'Authorization': f'token {pat}',
@@ -58,7 +46,6 @@ class PATAuth:
                     'valid': False,
                     'error': f'GitHub API error: {response.status_code}'
                 }
-                
         except Exception as e:
             return {
                 'valid': False,
@@ -66,20 +53,7 @@ class PATAuth:
             }
     
     def check_repo_access(self, pat: str, repo_full_name: str) -> Dict:
-        """
-        레포지토리 접근 권한 확인
-        
-        Args:
-            pat: Personal Access Token
-            repo_full_name: owner/repo 형식의 레포지토리 이름
-            
-        Returns:
-            {
-                'accessible': bool,
-                'repo_info': dict (if accessible),
-                'error': str (if not accessible)
-            }
-        """
+        """레포지토리 접근 권한 확인"""
         try:
             headers = {
                 'Authorization': f'token {pat}',
@@ -108,7 +82,6 @@ class PATAuth:
                     'accessible': False,
                     'error': f'GitHub API error: {response.status_code}'
                 }
-                
         except Exception as e:
             return {
                 'accessible': False,
@@ -116,21 +89,9 @@ class PATAuth:
             }
     
     def save_credential(self, user_id: str, pat: str, github_username: str, token_scopes: list = None) -> int:
-        """
-        인증 정보를 암호화하여 저장
-        
-        Args:
-            user_id: 사용자 식별자
-            pat: Personal Access Token
-            github_username: GitHub 사용자명
-            token_scopes: 토큰 권한 목록
-            
-        Returns:
-            credential_id
-        """
+        """인증 정보를 암호화하여 저장"""
         db = next(get_db())
         try:
-            # 기존 인증 정보가 있으면 업데이트
             existing = db.query(UserCredential).filter(
                 UserCredential.user_id == user_id
             ).first()
@@ -156,7 +117,6 @@ class PATAuth:
             
             db.commit()
             return credential_id
-            
         except Exception as e:
             db.rollback()
             raise e
@@ -164,15 +124,7 @@ class PATAuth:
             db.close()
     
     def get_decrypted_pat(self, user_id: str) -> Optional[str]:
-        """
-        사용자의 암호화된 PAT를 복호화하여 반환
-        
-        Args:
-            user_id: 사용자 식별자
-            
-        Returns:
-            복호화된 PAT 또는 None
-        """
+        """사용자의 암호화된 PAT를 복호화하여 반환"""
         db = next(get_db())
         try:
             credential = db.query(UserCredential).filter(
@@ -182,7 +134,6 @@ class PATAuth:
             if credential:
                 return decrypt_pat(credential.encrypted_pat)
             return None
-            
         finally:
             db.close()
     
@@ -195,7 +146,4 @@ class PATAuth:
             ).first()
         finally:
             db.close()
-
-from datetime import datetime
-from .models import get_db
 

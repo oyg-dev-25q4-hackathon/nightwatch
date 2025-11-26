@@ -1,4 +1,4 @@
-# src/slack_notifier.py
+# server/services/slack_notifier.py
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 import os
@@ -144,7 +144,10 @@ class SlackNotifier:
             "test_results": test_results
         }
         
-        report_path = f"reports/report_{timestamp}.json"
+        import os
+        from ..config import REPORTS_DIR
+        os.makedirs(REPORTS_DIR, exist_ok=True)
+        report_path = os.path.join(REPORTS_DIR, f"report_{timestamp}.json")
         with open(report_path, 'w', encoding='utf-8') as f:
             json.dump(report, f, indent=2, ensure_ascii=False)
         

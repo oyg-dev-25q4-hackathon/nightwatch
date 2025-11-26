@@ -5,24 +5,29 @@
 import os
 import threading
 from dotenv import load_dotenv
-from src.api_server import app as api_app
-from src.polling_scheduler import PollingScheduler
+from server.app import app
+from server.services.polling_scheduler import PollingScheduler
+from server.config import POLLING_INTERVAL_MINUTES
 
 load_dotenv()
 
 def run_api_server():
     """API 서버 실행"""
-    port = int(os.getenv('API_PORT', 5001))
+    import warnings
+    from server.config import API_PORT
+    
+    # Flask 개발 서버 경고 숨기기
+    warnings.filterwarnings('ignore', message='.*development server.*')
+    
+    port = int(API_PORT)
     print(f"🌐 Starting API server on port {port}...")
-    api_app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
 
 def run_polling_scheduler():
     """Polling 스케줄러 실행"""
-    interval = int(os.getenv('POLLING_INTERVAL_MINUTES', 5))
-    scheduler = PollingScheduler(interval_minutes=interval)
+    scheduler = PollingScheduler(interval_minutes=POLLING_INTERVAL_MINUTES)
     scheduler.start()
     
-    # 스레드가 종료되지 않도록 대기
     import time
     try:
         while True:
@@ -32,9 +37,10 @@ def run_polling_scheduler():
 
 if __name__ == "__main__":
     # 필수 디렉토리 생성
-    os.makedirs("videos", exist_ok=True)
-    os.makedirs("screenshots", exist_ok=True)
-    os.makedirs("reports", exist_ok=True)
+    from server.config import VIDEOS_DIR, SCREENSHOTS_DIR, REPORTS_DIR
+    os.makedirs(VIDEOS_DIR, exist_ok=True)
+    os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
+    os.makedirs(REPORTS_DIR, exist_ok=True)
     
     print("🌙 NightWatch Server Starting...")
     print(f"Gemini API Key: {'✓ Set' if os.getenv('GEMINI_API_KEY') else '✗ Missing'}")
@@ -47,4 +53,3 @@ if __name__ == "__main__":
     
     # API 서버 실행 (메인 스레드)
     run_api_server()
-

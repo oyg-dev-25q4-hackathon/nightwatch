@@ -1,4 +1,4 @@
-# src/browser_executor.py
+# server/services/browser_executor.py
 """
 Browser MCP를 사용하는 브라우저 실행기
 MCP 서버를 통해 브라우저 자동화를 수행
@@ -31,7 +31,8 @@ class BrowserExecutor:
             self.page = None
         else:
             # Playwright 폴백
-            self.video_dir = video_dir or "videos/fallback"
+            from ..config import VIDEOS_DIR
+            self.video_dir = video_dir or os.path.join(VIDEOS_DIR, "fallback")
             os.makedirs(self.video_dir, exist_ok=True)
             self.playwright = sync_playwright().start()
             self.browser = self.playwright.chromium.launch(
@@ -202,7 +203,9 @@ class BrowserExecutor:
                     screenshot_b64 = screenshot_data if isinstance(screenshot_data, str) else base64.b64encode(screenshot_data).decode()
                     
                     # 파일로 저장
-                    screenshot_path = f"screenshots/mcp_screenshot_{int(time.time())}.png"
+                    from ..config import SCREENSHOTS_DIR
+                    os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
+                    screenshot_path = os.path.join(SCREENSHOTS_DIR, f"mcp_screenshot_{int(time.time())}.png")
                     screenshot_bytes = base64.b64decode(screenshot_b64)
                     with open(screenshot_path, 'wb') as f:
                         f.write(screenshot_bytes)
@@ -216,7 +219,9 @@ class BrowserExecutor:
                 screenshot_bytes = self.page.screenshot(full_page=True)
                 screenshot_b64 = base64.b64encode(screenshot_bytes).decode()
                 
-                screenshot_path = f"screenshots/playwright_screenshot_{int(time.time())}.png"
+                from ..config import SCREENSHOTS_DIR
+                os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
+                screenshot_path = os.path.join(SCREENSHOTS_DIR, f"playwright_screenshot_{int(time.time())}.png")
                 with open(screenshot_path, 'wb') as f:
                     f.write(screenshot_bytes)
                 

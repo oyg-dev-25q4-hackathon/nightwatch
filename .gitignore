@@ -25,9 +25,7 @@ ENV/
 *.swo
 
 # Test outputs
-videos/
-screenshots/
-reports/
+output/
 *.mp4
 *.png
 *.json

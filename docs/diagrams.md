@@ -6,7 +6,7 @@
 sequenceDiagram
     participant Dev as 개발자
     participant GH as GitHub
-    participant WH as Webhook Server
+    participant WH as Agent
     participant K8s as K8s Deployer
     participant AI as Gemini AI
     participant MCP as Browser MCP
@@ -61,7 +61,7 @@ graph TB
     end
 
     subgraph "NightWatch Server"
-        WS[Webhook Server<br/>Flask]
+        WS[Agent<br/>Flask]
         PA[PR Analyzer<br/>Gemini API]
         BE[Browser Executor<br/>Browser MCP]
         VV[Vision Validator<br/>Gemini Vision]
@@ -232,7 +232,7 @@ graph LR
 ```mermaid
 graph TB
     subgraph "Core Modules"
-        WS[webhook_server.py<br/>메인 오케스트레이터]
+        WS[agent<br/>메인 오케스트레이터]
         K8S[k8s_deployer.py<br/>배포 관리]
         PA[pr_analyzer.py<br/>AI 분석]
         BE[browser_executor.py<br/>브라우저 실행]
