@@ -20,7 +20,23 @@ class PRAnalyzerService:
     def analyze_and_generate_scenarios(self, pr_diff, pr_url=None):
         """PR diff를 분석하여 테스트 시나리오 생성"""
         diff_text = self._format_diff(pr_diff)
-        test_url = pr_url if pr_url else f"https://{self.base_url}"
+        
+        # pr_url이 있으면 사용, 없으면 base_url 사용
+        if pr_url:
+            print(f"📝 PR URL received: {pr_url}")
+            # pr_url이 http:// 또는 https://로 시작하지 않으면 http:// 추가
+            if not pr_url.startswith(('http://', 'https://')):
+                # localhost인 경우 http 사용, 그 외는 https 사용
+                if pr_url.startswith('localhost') or pr_url.startswith('127.'):
+                    test_url = f"http://{pr_url}"
+                else:
+                    test_url = f"https://{pr_url}"
+            else:
+                test_url = pr_url
+            print(f"📝 Test URL generated: {test_url}")
+        else:
+            test_url = f"http://{self.base_url}" if self.base_url.startswith('localhost') or ':' in self.base_url else f"https://{self.base_url}"
+            print(f"📝 Using base URL: {test_url}")
         
         prompt = f"""
 당신은 E2E 테스트 전문가입니다. 다음 GitHub PR의 변경사항을 분석하고, 테스트해야 할 시나리오를 생성해주세요.
@@ -42,6 +58,7 @@ PR 변경사항:
       "actions": [
         {{"type": "goto", "url": "{test_url}"}},
         {{"type": "wait", "seconds": 2}},
+        {{"type": "set_viewport", "width": 1920, "height": 1080}},
         {{"type": "click", "selector": "#some-button"}},
         {{"type": "fill", "selector": "#input-field", "value": "test-value"}},
         {{"type": "screenshot", "name": "result"}}
@@ -53,13 +70,15 @@ PR 변경사항:
 
 **중요 규칙:**
 
-1. 실제로 실행 가능한 액션만 포함
+1. 실제로 실행 가능한 액션만 포함 (goto, click, fill, wait, screenshot, set_viewport만 사용)
 2. selector는 일반적인 CSS selector 사용 (id, class, tag 등)
 3. 최소 3개, 최대 5개의 시나리오 생성
 4. 변경된 코드와 직접 관련된 기능만 테스트
 5. URL은 {test_url} 또는 상대 경로(/)를 사용
 6. JSON 형식만 반환 (마크다운 코드블록 없이)
 7. global.oliveyoung.com 사이트의 실제 구조를 고려하여 시나리오 작성
+8. **절대 comment 타입의 액션을 생성하지 마세요. 설명은 description 필드에만 작성하세요.**
+9. 모바일 테스트가 필요한 경우 set_viewport 액션을 사용하세요 (예: {{"type": "set_viewport", "width": 375, "height": 667}})
 
 """
         

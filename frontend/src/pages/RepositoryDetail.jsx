@@ -15,10 +15,24 @@ function RepositoryDetail() {
   const [patInput, setPatInput] = useState("");
   const [updatingPAT, setUpdatingPAT] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [pollingInterval, setPollingInterval] = useState(null);
 
   useEffect(() => {
     fetchSubscription();
     fetchPRs();
+    
+    // 주기적으로 PR 목록 새로고침 (분석 중인 PR 상태 업데이트)
+    const interval = setInterval(() => {
+      fetchPRs();
+    }, 3000); // 3초마다 새로고침
+    
+    setPollingInterval(interval);
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
   }, [subscriptionId]);
 
   const fetchSubscription = async () => {
@@ -87,25 +101,18 @@ function RepositoryDetail() {
 
         if (detectedCount > 0) {
           // 감지된 PR 목록을 상세하게 표시
-          let prListMessage = `✅ PR 감지가 완료되었습니다!\n\n${detectedCount}개의 PR이 감지되어 테스트가 시작되었습니다.\n\n`;
+          let prListMessage = `✅ PR 감지가 완료되었습니다!\n\n${detectedCount}개의 PR이 감지되었습니다.\nAI 분석이 진행 중입니다...\n\n`;
           prList.forEach((pr, index) => {
             prListMessage += `${index + 1}. PR #${pr.number}: ${
               pr.title
-            }\n   브랜치: ${pr.branch}\n   URL: ${pr.url}\n\n`;
+            }\n   브랜치: ${pr.branch}\n\n`;
           });
           alert(prListMessage);
         } else {
           alert("✅ PR 감지가 완료되었습니다!\n\n새로운 PR이 없습니다.");
         }
-        // PR 목록 즉시 새로고침
+        // PR 목록 즉시 새로고침 (pending 상태로 표시됨)
         fetchPRs();
-        // DB 커밋 대기 후 다시 새로고침 (2초, 4초 후)
-        setTimeout(() => {
-          fetchPRs();
-        }, 2000);
-        setTimeout(() => {
-          fetchPRs();
-        }, 4000);
       } else {
         const errorData = response.data || {};
         if (errorData.error_type === "rate_limit") {
@@ -362,10 +369,19 @@ function RepositoryDetail() {
               {prs.map((pr, index) => (
                 <div
                   key={pr.id}
-                  onClick={() =>
-                    navigate(`/subscriptions/${subscriptionId}/prs/${pr.id}`)
-                  }
-                  className="p-6 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 cursor-pointer transition-all duration-200 group"
+                  onClick={() => {
+                    // running 또는 pending 상태일 때는 디테일 페이지 접근 제한
+                    if (pr.status === 'running' || pr.status === 'pending') {
+                      alert(`⏳ AI 분석이 진행 중입니다.\n\nPR #${pr.pr_number}의 분석이 완료되면 디테일 페이지를 확인할 수 있습니다.\n\n현재 상태: ${pr.status === 'running' ? '🔄 실행 중' : '⏳ 대기'}`);
+                      return;
+                    }
+                    navigate(`/subscriptions/${subscriptionId}/prs/${pr.id}`);
+                  }}
+                  className={`p-6 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 transition-all duration-200 group ${
+                    pr.status === 'running' || pr.status === 'pending' 
+                      ? 'cursor-wait opacity-75' 
+                      : 'cursor-pointer'
+                  }`}
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
                   <div className="flex items-center justify-between">
@@ -379,8 +395,7 @@ function RepositoryDetail() {
                             <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
                               {pr.pr_title || `PR #${pr.pr_number}`}
                             </h3>
-                            {pr.status === "completed" &&
-                              getStatusBadge(pr.status)}
+                            {getStatusBadge(pr.status)}
                           </div>
                           {pr.branch_name && (
                             <p className="text-sm text-gray-600 font-medium">

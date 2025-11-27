@@ -50,12 +50,24 @@ class TestPipelineService:
                 print(f"🌐 Using base URL from subscription: {base_url}")
                 print(f"   ✅ Generated PR URL: {pr_full_url}")
             else:
-                # 배포 URL이 없으면 로컬 모드로 실행 (localhost:5173 사용)
-                print(f"🌐 Using localhost:5173 for testing")
-                pr_url = "localhost:5173"
-                pr_full_url = f"http://{pr_url}"
-                skip_deployment = True  # 배포는 이미 되어 있다고 가정
-                print(f"   ✅ Using local URL: {pr_full_url}")
+                # 배포 URL이 없으면 로컬 포트 할당 모드
+                deployment_mode = os.getenv('DEPLOYMENT_MODE', 'local_port')
+                if deployment_mode == 'local_port':
+                    # 5173 이후 포트 할당
+                    port_base = int(os.getenv('LOCAL_PORT_BASE', '5173'))
+                    pr_port = port_base + pr_number
+                    pr_url = f"localhost:{pr_port}"
+                    pr_full_url = f"http://{pr_url}"
+                    skip_deployment = True  # 배포는 이미 되어 있다고 가정
+                    print(f"🌐 Using local port allocation: {pr_full_url}")
+                    print(f"   Note: Make sure your app is running on port {pr_port}")
+                else:
+                    # 기본 localhost:5173 사용
+                    print(f"🌐 Using localhost:5173 for testing")
+                    pr_url = "localhost:5173"
+                    pr_full_url = f"http://{pr_url}"
+                    skip_deployment = True  # 배포는 이미 되어 있다고 가정
+                    print(f"   ✅ Using local URL: {pr_full_url}")
             
             # 2. PR 분석 및 시나리오 생성
             print("📝 Analyzing PR with Gemini...")

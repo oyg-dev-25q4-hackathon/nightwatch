@@ -158,8 +158,20 @@ class PollingService:
             
             if all_prs:
                 print(f"    ✅ Found {len(all_prs)} PR(s) to test")
+                # PR 감지 후 즉시 DB에 pending 상태로 저장
                 for pr in all_prs:
-                    self._run_test_for_pr(pr, subscription)
+                    self._create_test_record(pr, subscription)
+                
+                # 백그라운드에서 테스트 실행 (비동기)
+                import threading
+                for pr in all_prs:
+                    thread = threading.Thread(
+                        target=self._run_test_for_pr,
+                        args=(pr, subscription),
+                        daemon=True
+                    )
+                    thread.start()
+                    print(f"      🚀 Started background test for PR #{pr.number}")
             else:
                 print(f"    ℹ️ No new or updated PRs")
             
@@ -179,13 +191,11 @@ class PollingService:
                 print(f"    ❌ Error fetching PRs: {str(e)}")
                 raise
     
-    def _run_test_for_pr(self, pr, subscription: Subscription):
-        """PR에 대해 테스트 실행"""
+    def _create_test_record(self, pr, subscription: Subscription):
+        """PR에 대한 테스트 레코드 생성 (pending 상태)"""
         pr_number = pr.number
         repo_name = subscription.repo_full_name
         branch_name = pr.head.ref
-        
-        print(f"    🚀 Running test for PR #{pr_number}...")
         
         db = next(get_db())
         try:
@@ -197,10 +207,10 @@ class PollingService:
             ).first()
             
             if recent_test:
-                print(f"      ℹ️ Test already running or pending for PR #{pr_number}, skipping")
-                return
+                print(f"      ℹ️ Test already exists for PR #{pr_number} (status: {recent_test.status}), skipping")
+                return recent_test.id
             
-            # 완료된 테스트가 있는지 확인 (디버깅용)
+            # 완료된 테스트가 있는지 확인
             completed_test = db.query(Test).filter(
                 Test.subscription_id == subscription.id,
                 Test.pr_number == pr_number,
@@ -222,10 +232,40 @@ class PollingService:
             db.add(test)
             db.commit()
             test_id = test.id
+            print(f"      ✅ Created test record for PR #{pr_number} (ID: {test_id}, status: pending)")
+            return test_id
             
         except Exception as e:
             db.rollback()
             print(f"      ❌ Failed to create test record: {str(e)}")
+            return None
+        finally:
+            db.close()
+    
+    def _run_test_for_pr(self, pr, subscription: Subscription):
+        """PR에 대해 테스트 실행 (백그라운드에서 실행)"""
+        pr_number = pr.number
+        repo_name = subscription.repo_full_name
+        branch_name = pr.head.ref
+        
+        print(f"    🚀 Running test for PR #{pr_number} in background...")
+        
+        # 테스트 레코드 찾기
+        db = next(get_db())
+        try:
+            test = db.query(Test).filter(
+                Test.subscription_id == subscription.id,
+                Test.pr_number == pr_number,
+                Test.status == 'pending'
+            ).order_by(Test.created_at.desc()).first()
+            
+            if not test:
+                print(f"      ❌ Test record not found for PR #{pr_number}")
+                return
+            
+            test_id = test.id
+        except Exception as e:
+            print(f"      ❌ Failed to find test record: {str(e)}")
             return
         finally:
             db.close()

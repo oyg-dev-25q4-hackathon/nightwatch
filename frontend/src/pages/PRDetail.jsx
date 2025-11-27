@@ -15,7 +15,18 @@ function PRDetail() {
 
   useEffect(() => {
     fetchTestDetail();
-  }, [testId]);
+    
+    // running 또는 pending 상태일 때 주기적으로 상태 확인
+    const interval = setInterval(() => {
+      if (test && (test.status === 'running' || test.status === 'pending')) {
+        fetchTestDetail();
+      }
+    }, 2000); // 2초마다 확인
+    
+    return () => {
+      clearInterval(interval);
+    };
+  }, [testId, test?.status]);
 
   const fetchTestDetail = async () => {
     try {
@@ -269,6 +280,34 @@ function PRDetail() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center text-red-600">
             테스트 정보를 찾을 수 없습니다.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // running 또는 pending 상태일 때 로딩 화면 표시
+  if (test.status === 'running' || test.status === 'pending') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
+        <Header />
+        <div className="max-w-7xl mx-auto p-8">
+          <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
+            <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-6"></div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              {test.status === 'running' ? '🔄 AI 분석 진행 중...' : '⏳ 대기 중...'}
+            </h2>
+            <p className="text-gray-600 mb-2">
+              PR #{test.pr_number}: {test.pr_title || '제목 없음'}
+            </p>
+            <p className="text-sm text-gray-500">
+              {test.status === 'running' 
+                ? 'Gemini AI가 PR 변경사항을 분석하고 테스트 시나리오를 생성하고 있습니다.'
+                : '테스트 실행을 대기 중입니다.'}
+            </p>
+            <p className="text-xs text-gray-400 mt-4">
+              분석이 완료되면 자동으로 결과가 표시됩니다...
+            </p>
           </div>
         </div>
       </div>

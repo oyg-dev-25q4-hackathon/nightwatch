@@ -317,7 +317,7 @@ class TestController:
             # PR 배포 URL 생성
             pr_url = None
             base_url = subscription.base_url
-            deployment_mode = os.getenv('DEPLOYMENT_MODE', 'skip')
+            deployment_mode = os.getenv('DEPLOYMENT_MODE', 'local_port')
             
             if subscription.base_url:
                 # 구독에 base_url이 있으면 PR URL 자동 생성
@@ -341,9 +341,22 @@ class TestController:
                     print(f"🚀 PR #{test.pr_number} deployed locally at {pr_url}")
                 except Exception as deploy_err:
                     print(f"⚠️ Local deployment failed: {deploy_err}")
-                    print(f"   Falling back to localhost:5173")
-                    pr_url = "localhost:5173"
+                    print(f"   Falling back to local port allocation")
+                    # 폴백: 5173 이후 포트 할당
+                    port_base = int(os.getenv('LOCAL_PORT_BASE', '5173'))
+                    pr_port = port_base + test.pr_number
+                    pr_url = f"localhost:{pr_port}"
                     base_url = None
+                    print(f"   Using localhost:{pr_port}")
+            elif deployment_mode == 'local_port':
+                # 간단한 로컬 포트 할당 모드: 5173 이후 포트 사용
+                port_base = int(os.getenv('LOCAL_PORT_BASE', '5173'))
+                pr_port = port_base + test.pr_number
+                pr_url = f"localhost:{pr_port}"
+                base_url = None
+                print(f"🌐 Using local port allocation: {pr_url}")
+                print(f"   PR #{test.pr_number} will use port {pr_port} (base: {port_base} + PR: {test.pr_number})")
+                print(f"   Note: Make sure your app is running on port {pr_port}")
             else:
                 # 배포 모드가 skip이거나 base_url이 없으면 기존 localhost:5173 사용
                 pr_url = "localhost:5173"

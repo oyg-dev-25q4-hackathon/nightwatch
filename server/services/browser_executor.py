@@ -80,6 +80,7 @@ class BrowserExecutor:
                 'scenario_name': scenario_name,
                 'description': description,
                 'expected_result': expected_result,
+                'actions': [],
                 'actions_executed': [],
                 'success': False,
                 'error': '시나리오에 실행할 액션이 없습니다.',
@@ -90,14 +91,35 @@ class BrowserExecutor:
             'scenario_name': scenario_name,
             'description': description,
             'expected_result': expected_result,
+            'actions': actions,  # 원본 액션 목록도 저장 (프론트엔드 표시용)
             'actions_executed': [],
             'success': True,
             'error': None,
             'screenshot': None
         }
         
+        # 지원되지 않는 액션 타입 필터링 (comment 등)
+        supported_action_types = ['goto', 'click', 'fill', 'wait', 'screenshot', 'set_viewport']
+        filtered_actions = [action for action in actions if action.get('type') in supported_action_types]
+        
+        if len(filtered_actions) < len(actions):
+            skipped_count = len(actions) - len(filtered_actions)
+            print(f"⚠️ {skipped_count}개의 지원되지 않는 액션 타입이 필터링되었습니다.")
+        
+        if not filtered_actions:
+            return {
+                'scenario_name': scenario_name,
+                'description': description,
+                'expected_result': expected_result,
+                'actions': actions,
+                'actions_executed': [],
+                'success': False,
+                'error': '시나리오에 실행 가능한 액션이 없습니다.',
+                'screenshot': None
+            }
+        
         try:
-            for action in actions:
+            for action in filtered_actions:
                 # PR URL이 있으면 goto 액션의 URL을 대체
                 if action['type'] == 'goto' and pr_url:
                     original_url = action['url']
@@ -204,6 +226,15 @@ class BrowserExecutor:
                     screenshot_b64 = screenshot_data if isinstance(screenshot_data, str) else base64.b64encode(screenshot_data).decode()
                     return {'action': action, 'success': True, 'screenshot': screenshot_b64}
                 return {'action': action, 'success': False, 'error': result.get('error')}
+            elif action_type == 'set_viewport':
+                # 뷰포트 크기 설정
+                width = action.get('width', 1920)
+                height = action.get('height', 1080)
+                result = self.mcp_client.resize(width, height)
+                return {'action': action, 'success': result.get('success', True), 'error': result.get('error')}
+            elif action_type == 'comment':
+                # comment 타입은 무시하고 성공으로 처리 (설명용 액션)
+                return {'action': action, 'success': True, 'skipped': True}
             else:
                 return {'action': action, 'success': False, 'error': f'Unknown action type: {action_type}'}
             
@@ -234,6 +265,13 @@ class BrowserExecutor:
             time.sleep(action.get('seconds', 1))
             return {'action': action, 'success': True}
         
+        elif action_type == 'set_viewport':
+            # 뷰포트 크기 설정
+            width = action.get('width', 1920)
+            height = action.get('height', 1080)
+            self.page.set_viewport_size({'width': width, 'height': height})
+            return {'action': action, 'success': True}
+        
         elif action_type == 'screenshot':
             screenshot_bytes = self.page.screenshot()
             screenshot_b64 = base64.b64encode(screenshot_bytes).decode()
@@ -243,6 +281,16 @@ class BrowserExecutor:
                 'screenshot': screenshot_b64
             }
         
+        elif action_type == 'set_viewport':
+            # 뷰포트 크기 설정
+            width = action.get('width', 1920)
+            height = action.get('height', 1080)
+            self.page.set_viewport_size({'width': width, 'height': height})
+            return {'action': action, 'success': True}
+        
+        elif action_type == 'comment':
+            # comment 타입은 무시하고 성공으로 처리 (설명용 액션)
+            return {'action': action, 'success': True, 'skipped': True}
         else:
             return {
                 'action': action,

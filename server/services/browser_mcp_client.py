@@ -45,6 +45,10 @@ class BrowserMCPClient:
         time.sleep(seconds)
         return {'success': True}
     
+    def resize(self, width: int, height: int) -> Dict:
+        """브라우저 창 크기 조정 (뷰포트 설정)"""
+        return self._call_mcp('browser_resize', {'width': width, 'height': height})
+    
     def snapshot(self) -> Dict:
         """페이지 스냅샷 (접근성 정보)"""
         return self._call_mcp('browser_snapshot', {})
