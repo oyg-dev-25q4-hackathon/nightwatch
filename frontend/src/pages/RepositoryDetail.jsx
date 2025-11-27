@@ -219,9 +219,31 @@ function RepositoryDetail() {
 
   if (loading && !subscription) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center">로딩 중...</div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
+        <Header />
+        <div className="flex items-center justify-center min-h-[80vh]">
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <div
+                className="w-3 h-3 bg-blue-600 rounded-full animate-bounce"
+                style={{ animationDelay: "0ms" }}
+              ></div>
+              <div
+                className="w-3 h-3 bg-purple-600 rounded-full animate-bounce"
+                style={{ animationDelay: "150ms" }}
+              ></div>
+              <div
+                className="w-3 h-3 bg-pink-600 rounded-full animate-bounce"
+                style={{ animationDelay: "300ms" }}
+              ></div>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              NightWatch
+            </h2>
+            <p className="text-gray-600 text-lg font-medium">
+              구독 정보를 불러오는 중...
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -235,7 +257,23 @@ function RepositoryDetail() {
         <div className="max-w-7xl mx-auto p-8">
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+              <div className="flex items-center justify-center gap-3 mb-6">
+                <div
+                  className="w-3 h-3 bg-blue-600 rounded-full animate-bounce"
+                  style={{ animationDelay: "0ms" }}
+                ></div>
+                <div
+                  className="w-3 h-3 bg-purple-600 rounded-full animate-bounce"
+                  style={{ animationDelay: "150ms" }}
+                ></div>
+                <div
+                  className="w-3 h-3 bg-pink-600 rounded-full animate-bounce"
+                  style={{ animationDelay: "300ms" }}
+                ></div>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                NightWatch
+              </h2>
               <p className="text-gray-600 text-lg font-medium">
                 구독 정보를 불러오는 중...
               </p>
@@ -389,8 +427,24 @@ function RepositoryDetail() {
           </div>
           {loading ? (
             <div className="p-12 text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="mt-4 text-gray-500">로딩 중...</p>
+              <div className="flex items-center justify-center gap-3 mb-6">
+                <div
+                  className="w-3 h-3 bg-blue-600 rounded-full animate-bounce"
+                  style={{ animationDelay: "0ms" }}
+                ></div>
+                <div
+                  className="w-3 h-3 bg-purple-600 rounded-full animate-bounce"
+                  style={{ animationDelay: "150ms" }}
+                ></div>
+                <div
+                  className="w-3 h-3 bg-pink-600 rounded-full animate-bounce"
+                  style={{ animationDelay: "300ms" }}
+                ></div>
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">
+                NightWatch
+              </h3>
+              <p className="text-gray-600">PR 목록을 불러오는 중...</p>
             </div>
           ) : prs.length === 0 && nonTargetPrs.length === 0 ? (
             <div className="p-12 text-center">

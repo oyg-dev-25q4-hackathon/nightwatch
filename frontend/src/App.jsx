@@ -15,6 +15,7 @@ function Home() {
   const [tests, setTests] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true); // 초기 로딩 상태
   const [pollingAll, setPollingAll] = useState(false);
   const [userId] = useState("user123"); // 실제로는 인증에서 가져옴
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
@@ -57,8 +58,17 @@ function Home() {
   };
 
   useEffect(() => {
-    fetchSubscriptions();
-    fetchTests();
+    // 초기 데이터 로딩
+    const loadInitialData = async () => {
+      setInitialLoading(true);
+      try {
+        await Promise.all([fetchSubscriptions(), fetchTests()]);
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+
+    loadInitialData();
 
     // 주기적으로 갱신
     const interval = setInterval(() => {
@@ -296,6 +306,39 @@ function Home() {
     }
   };
 
+  // 초기 로딩 중일 때 로딩 화면 표시
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
+        <Header />
+        <div className="flex items-center justify-center min-h-[80vh]">
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <div
+                className="w-3 h-3 bg-blue-600 rounded-full animate-bounce"
+                style={{ animationDelay: "0ms" }}
+              ></div>
+              <div
+                className="w-3 h-3 bg-purple-600 rounded-full animate-bounce"
+                style={{ animationDelay: "150ms" }}
+              ></div>
+              <div
+                className="w-3 h-3 bg-pink-600 rounded-full animate-bounce"
+                style={{ animationDelay: "300ms" }}
+              ></div>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              NightWatch
+            </h2>
+            <p className="text-gray-600 text-lg font-medium">
+              구독 정보를 불러오는 중...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -389,7 +432,14 @@ function Home() {
                     />
                     <circle cx="80" cy="130" r="8" fill="white" />
                     <circle cx="120" cy="130" r="8" fill="white" />
-                    <rect x="85" y="150" width="30" height="5" rx="2" fill="white" />
+                    <rect
+                      x="85"
+                      y="150"
+                      width="30"
+                      height="5"
+                      rx="2"
+                      fill="white"
+                    />
                     <path
                       d="M 100 60 L 100 100"
                       stroke="white"
@@ -405,16 +455,8 @@ function Home() {
                     <circle cx="20" cy="50" r="8" fill="white" />
                     <circle cx="50" cy="50" r="8" fill="white" />
                     <circle cx="80" cy="50" r="8" fill="white" />
-                    <path
-                      d="M 28 50 L 42 50"
-                      stroke="white"
-                      strokeWidth="3"
-                    />
-                    <path
-                      d="M 58 50 L 72 50"
-                      stroke="white"
-                      strokeWidth="3"
-                    />
+                    <path d="M 28 50 L 42 50" stroke="white" strokeWidth="3" />
+                    <path d="M 58 50 L 72 50" stroke="white" strokeWidth="3" />
                   </svg>
                 </div>
 
@@ -427,7 +469,8 @@ function Home() {
                       AI 기반 E2E 테스트 자동화
                     </h2>
                     <p className="text-lg md:text-xl text-white/95 drop-shadow-md">
-                      Gemini AI가 PR 변경사항을 분석하고<br />
+                      Gemini AI가 PR 변경사항을 분석하고
+                      <br />
                       자동으로 테스트 시나리오를 생성합니다
                     </p>
                   </div>
@@ -464,7 +507,14 @@ function Home() {
                       d="M 50 10 L 20 30 L 20 70 L 50 90 L 80 70 L 80 30 Z"
                       fill="white"
                     />
-                    <circle cx="50" cy="45" r="8" fill="none" stroke="#f5576c" strokeWidth="2" />
+                    <circle
+                      cx="50"
+                      cy="45"
+                      r="8"
+                      fill="none"
+                      stroke="#f5576c"
+                      strokeWidth="2"
+                    />
                     <path
                       d="M 50 53 L 50 65"
                       stroke="#f5576c"
@@ -499,7 +549,8 @@ function Home() {
                       실시간 PR 모니터링
                     </h2>
                     <p className="text-lg md:text-xl text-white/95 drop-shadow-md">
-                      GitHub PR을 자동으로 감지하고<br />
+                      GitHub PR을 자동으로 감지하고
+                      <br />
                       즉시 테스트를 실행합니다
                     </p>
                   </div>
@@ -583,11 +634,46 @@ function Home() {
                       fill="white"
                       opacity="0.3"
                     />
-                    <rect x="20" y="25" width="40" height="4" rx="2" fill="white" />
-                    <rect x="20" y="35" width="50" height="4" rx="2" fill="white" />
-                    <rect x="20" y="45" width="35" height="4" rx="2" fill="white" />
-                    <rect x="20" y="55" width="45" height="4" rx="2" fill="white" />
-                    <rect x="20" y="65" width="30" height="4" rx="2" fill="white" />
+                    <rect
+                      x="20"
+                      y="25"
+                      width="40"
+                      height="4"
+                      rx="2"
+                      fill="white"
+                    />
+                    <rect
+                      x="20"
+                      y="35"
+                      width="50"
+                      height="4"
+                      rx="2"
+                      fill="white"
+                    />
+                    <rect
+                      x="20"
+                      y="45"
+                      width="35"
+                      height="4"
+                      rx="2"
+                      fill="white"
+                    />
+                    <rect
+                      x="20"
+                      y="55"
+                      width="45"
+                      height="4"
+                      rx="2"
+                      fill="white"
+                    />
+                    <rect
+                      x="20"
+                      y="65"
+                      width="30"
+                      height="4"
+                      rx="2"
+                      fill="white"
+                    />
                   </svg>
                 </div>
 
@@ -606,7 +692,10 @@ function Home() {
 
                 {/* 반짝이는 별들 */}
                 <div className="absolute top-20 left-20 w-4 h-4 opacity-60">
-                  <svg viewBox="0 0 20 20" className="w-full h-full animate-pulse">
+                  <svg
+                    viewBox="0 0 20 20"
+                    className="w-full h-full animate-pulse"
+                  >
                     <polygon
                       points="10,2 12,8 18,8 13,12 15,18 10,14 5,18 7,12 2,8 8,8"
                       fill="white"
@@ -614,7 +703,11 @@ function Home() {
                   </svg>
                 </div>
                 <div className="absolute top-32 right-32 w-3 h-3 opacity-50">
-                  <svg viewBox="0 0 20 20" className="w-full h-full animate-pulse" style={{ animationDelay: '0.5s' }}>
+                  <svg
+                    viewBox="0 0 20 20"
+                    className="w-full h-full animate-pulse"
+                    style={{ animationDelay: "0.5s" }}
+                  >
                     <polygon
                       points="10,2 12,8 18,8 13,12 15,18 10,14 5,18 7,12 2,8 8,8"
                       fill="white"
@@ -622,7 +715,11 @@ function Home() {
                   </svg>
                 </div>
                 <div className="absolute bottom-24 right-24 w-5 h-5 opacity-40">
-                  <svg viewBox="0 0 20 20" className="w-full h-full animate-pulse" style={{ animationDelay: '1s' }}>
+                  <svg
+                    viewBox="0 0 20 20"
+                    className="w-full h-full animate-pulse"
+                    style={{ animationDelay: "1s" }}
+                  >
                     <polygon
                       points="10,2 12,8 18,8 13,12 15,18 10,14 5,18 7,12 2,8 8,8"
                       fill="white"
@@ -632,14 +729,18 @@ function Home() {
 
                 <div className="absolute inset-0 flex items-center justify-center text-white p-8 z-10">
                   <div className="text-center max-w-3xl">
-                    <div className="text-6xl md:text-7xl lg:text-8xl mb-4 animate-spin" style={{ animationDuration: '20s' }}>
+                    <div
+                      className="text-6xl md:text-7xl lg:text-8xl mb-4 animate-spin"
+                      style={{ animationDuration: "20s" }}
+                    >
                       🌐
                     </div>
                     <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 drop-shadow-lg">
                       브라우저 자동화 테스트
                     </h2>
                     <p className="text-lg md:text-xl text-white/95 drop-shadow-md">
-                      Playwright와 Vision AI로<br />
+                      Playwright와 Vision AI로
+                      <br />
                       실제 사용자 경험을 검증합니다
                     </p>
                   </div>
@@ -686,9 +787,7 @@ function Home() {
               </svg>
             </button>
             <button
-              onClick={() =>
-                setCurrentBannerIndex((prev) => (prev + 1) % 3)
-              }
+              onClick={() => setCurrentBannerIndex((prev) => (prev + 1) % 3)}
               className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/30 text-white p-2 rounded-full transition-all z-10"
               aria-label="다음 배너"
             >
@@ -918,7 +1017,6 @@ function Home() {
                     접근 권한)
                   </p>
                 </div>
-
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

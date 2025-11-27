@@ -327,9 +327,24 @@ function PRDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center">로딩 중...</div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <div
+              className="w-3 h-3 bg-blue-600 rounded-full animate-bounce"
+              style={{ animationDelay: "0ms" }}
+            ></div>
+            <div
+              className="w-3 h-3 bg-purple-600 rounded-full animate-bounce"
+              style={{ animationDelay: "150ms" }}
+            ></div>
+            <div
+              className="w-3 h-3 bg-pink-600 rounded-full animate-bounce"
+              style={{ animationDelay: "300ms" }}
+            ></div>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">NightWatch</h2>
+          <p className="text-gray-600">테스트 정보를 불러오는 중...</p>
         </div>
       </div>
     );
@@ -354,7 +369,20 @@ function PRDetail() {
         <Header />
         <div className="max-w-7xl mx-auto p-8">
           <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
-            <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-6"></div>
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <div
+                className="w-3 h-3 bg-blue-600 rounded-full animate-bounce"
+                style={{ animationDelay: "0ms" }}
+              ></div>
+              <div
+                className="w-3 h-3 bg-purple-600 rounded-full animate-bounce"
+                style={{ animationDelay: "150ms" }}
+              ></div>
+              <div
+                className="w-3 h-3 bg-pink-600 rounded-full animate-bounce"
+                style={{ animationDelay: "300ms" }}
+              ></div>
+            </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
               {test.status === "running"
                 ? "🔄 AI 분석 진행 중..."
