@@ -19,6 +19,8 @@ function Home() {
   const [pollingAll, setPollingAll] = useState(false);
   const [userId] = useState("user123"); // 실제로는 인증에서 가져옴
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const [sortField, setSortField] = useState(null); // 'pr_number', 'created_at', 'completed_at'
+  const [sortOrder, setSortOrder] = useState("asc"); // 'asc' or 'desc'
 
   // 폼 상태
   const [formData, setFormData] = useState({
@@ -305,6 +307,49 @@ function Home() {
       alert(`구독 해제 실패: ${error.response?.data?.error || error.message}`);
     }
   };
+
+  // 정렬 처리 함수
+  const handleSort = (field) => {
+    if (sortField === field) {
+      // 같은 필드를 클릭하면 오름차순/내림차순 토글
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      // 다른 필드를 클릭하면 해당 필드로 정렬 (기본 오름차순)
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
+
+  // 정렬된 테스트 목록
+  const sortedTests = [...tests].sort((a, b) => {
+    if (!sortField) return 0;
+
+    let aValue, bValue;
+
+    if (sortField === "pr_number") {
+      aValue = a.pr_number;
+      bValue = b.pr_number;
+    } else if (sortField === "created_at") {
+      aValue = new Date(a.created_at).getTime();
+      bValue = new Date(b.created_at).getTime();
+    } else if (sortField === "completed_at") {
+      // 완료일이 없는 경우를 처리 (null인 경우 가장 뒤로)
+      aValue = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+      bValue = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+      // null 값 처리: null인 경우를 뒤로 보내기 위해 특별 처리
+      if (!a.completed_at && !b.completed_at) return 0;
+      if (!a.completed_at) return 1;
+      if (!b.completed_at) return -1;
+    } else {
+      return 0;
+    }
+
+    if (sortOrder === "asc") {
+      return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+    } else {
+      return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+    }
+  });
 
   // 초기 로딩 중일 때 로딩 화면 표시
   if (initialLoading) {
@@ -886,7 +931,17 @@ function Home() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      PR
+                      <button
+                        onClick={() => handleSort("pr_number")}
+                        className="flex items-center gap-2 hover:text-gray-700 transition-colors"
+                      >
+                        PR
+                        {sortField === "pr_number" && (
+                          <span className="text-blue-600">
+                            {sortOrder === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </button>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       레포지토리
@@ -895,15 +950,35 @@ function Home() {
                       상태
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      생성일
+                      <button
+                        onClick={() => handleSort("created_at")}
+                        className="flex items-center gap-2 hover:text-gray-700 transition-colors"
+                      >
+                        생성일
+                        {sortField === "created_at" && (
+                          <span className="text-blue-600">
+                            {sortOrder === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </button>
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      완료일
+                      <button
+                        onClick={() => handleSort("completed_at")}
+                        className="flex items-center gap-2 hover:text-gray-700 transition-colors"
+                      >
+                        완료일
+                        {sortField === "completed_at" && (
+                          <span className="text-blue-600">
+                            {sortOrder === "asc" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </button>
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {tests.map((test) => (
+                  {sortedTests.map((test) => (
                     <tr key={test.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <a

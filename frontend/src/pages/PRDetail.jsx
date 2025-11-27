@@ -425,16 +425,11 @@ function PRDetail() {
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24"></div>
             <div className="relative z-10">
               <div className="flex items-start justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 shadow-lg">
-                    <span className="text-4xl">🔍</span>
-                  </div>
-                  <div>
-                    <h1 className="text-4xl font-bold mb-2">
-                      {test.pr_title || `PR #${test.pr_number}`}
-                    </h1>
-                    <p className="text-purple-100">Pull Request Test Details</p>
-                  </div>
+                <div>
+                  <h1 className="text-4xl font-bold mb-2">
+                    {test.pr_title || `PR #${test.pr_number}`}
+                  </h1>
+                  <p className="text-purple-100">Pull Request Test Details</p>
                 </div>
                 <div>{getStatusBadge(test.status)}</div>
               </div>
