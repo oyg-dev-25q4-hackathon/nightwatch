@@ -17,12 +17,12 @@ function Home() {
   const [loading, setLoading] = useState(false);
   const [pollingAll, setPollingAll] = useState(false);
   const [userId] = useState("user123"); // 실제로는 인증에서 가져옴
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
   // 폼 상태
   const [formData, setFormData] = useState({
     repo_full_name: "",
     pat: "",
-    base_url: "", // 기본 배포 URL (예: global.oliveyoung.com) - PR URL은 pr-{번호}.{base_url} 형식으로 자동 생성
     auto_test: true,
     slack_notify: false, // 기본값: 비활성화
     exclude_branches: "main", // 기본값: main만 제외
@@ -67,6 +67,15 @@ function Home() {
     }, 30000); // 30초마다
 
     return () => clearInterval(interval);
+  }, []);
+
+  // 배너 자동 캐러셀
+  useEffect(() => {
+    const bannerInterval = setInterval(() => {
+      setCurrentBannerIndex((prev) => (prev + 1) % 3);
+    }, 5000); // 5초마다 자동 전환
+
+    return () => clearInterval(bannerInterval);
   }, []);
 
   // PAT 검증
@@ -149,7 +158,7 @@ function Home() {
         return;
       }
 
-      // 기본 배포 URL은 선택사항 (비워두면 로컬 배포 사용)
+      // preview 브랜치만 테스트 대상이므로 항상 preview-dev.oliveyoung.com 사용
 
       // 1. PAT 검증
       try {
@@ -195,7 +204,6 @@ function Home() {
         user_id: userId,
         repo_full_name: normalizedRepoName, // 정규화된 레포지토리 이름 사용
         pat: formData.pat, // PAT 필수
-        base_url: formData.base_url.trim() || null, // 기본 배포 URL (선택사항, 예: global.oliveyoung.com)
         auto_test: formData.auto_test,
         slack_notify: formData.slack_notify,
         exclude_branches: excludeBranches,
@@ -209,7 +217,6 @@ function Home() {
         setFormData({
           repo_full_name: "",
           pat: "",
-          base_url: "",
           auto_test: true,
           slack_notify: false, // 기본값: 비활성화
           exclude_branches: "main",
@@ -323,6 +330,385 @@ function Home() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* 배너 캐러셀 */}
+        <section className="mb-8">
+          <div className="relative h-64 md:h-80 lg:h-96 rounded-2xl overflow-hidden shadow-2xl">
+            {/* 배너 이미지들 */}
+            <div className="relative w-full h-full">
+              {/* 배너 1: AI 기반 테스트 자동화 */}
+              <div
+                className={`absolute inset-0 transition-opacity duration-1000 ${
+                  currentBannerIndex === 0 ? "opacity-100" : "opacity-0"
+                }`}
+                style={{
+                  background:
+                    "linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)",
+                }}
+              >
+                {/* 배경 패턴 */}
+                <svg
+                  className="absolute inset-0 w-full h-full opacity-20"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <defs>
+                    <pattern
+                      id="grid1"
+                      width="40"
+                      height="40"
+                      patternUnits="userSpaceOnUse"
+                    >
+                      <path
+                        d="M 40 0 L 0 0 0 40"
+                        fill="none"
+                        stroke="white"
+                        strokeWidth="1"
+                      />
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#grid1)" />
+                </svg>
+
+                {/* AI 로봇 일러스트 */}
+                <div className="absolute top-10 right-10 w-32 h-32 md:w-48 md:h-48 opacity-30">
+                  <svg viewBox="0 0 200 200" className="w-full h-full">
+                    <circle
+                      cx="100"
+                      cy="60"
+                      r="35"
+                      fill="white"
+                      opacity="0.3"
+                    />
+                    <rect
+                      x="50"
+                      y="100"
+                      width="100"
+                      height="80"
+                      rx="10"
+                      fill="white"
+                      opacity="0.3"
+                    />
+                    <circle cx="80" cy="130" r="8" fill="white" />
+                    <circle cx="120" cy="130" r="8" fill="white" />
+                    <rect x="85" y="150" width="30" height="5" rx="2" fill="white" />
+                    <path
+                      d="M 100 60 L 100 100"
+                      stroke="white"
+                      strokeWidth="8"
+                      opacity="0.3"
+                    />
+                  </svg>
+                </div>
+
+                {/* 데이터 흐름 일러스트 */}
+                <div className="absolute bottom-10 left-10 w-24 h-24 md:w-32 md:h-32 opacity-20">
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    <circle cx="20" cy="50" r="8" fill="white" />
+                    <circle cx="50" cy="50" r="8" fill="white" />
+                    <circle cx="80" cy="50" r="8" fill="white" />
+                    <path
+                      d="M 28 50 L 42 50"
+                      stroke="white"
+                      strokeWidth="3"
+                    />
+                    <path
+                      d="M 58 50 L 72 50"
+                      stroke="white"
+                      strokeWidth="3"
+                    />
+                  </svg>
+                </div>
+
+                <div className="absolute inset-0 flex items-center justify-center text-white p-8 z-10">
+                  <div className="text-center max-w-3xl">
+                    <div className="text-6xl md:text-7xl lg:text-8xl mb-4 animate-pulse">
+                      🤖
+                    </div>
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 drop-shadow-lg">
+                      AI 기반 E2E 테스트 자동화
+                    </h2>
+                    <p className="text-lg md:text-xl text-white/95 drop-shadow-md">
+                      Gemini AI가 PR 변경사항을 분석하고<br />
+                      자동으로 테스트 시나리오를 생성합니다
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 배너 2: 실시간 PR 모니터링 */}
+              <div
+                className={`absolute inset-0 transition-opacity duration-1000 ${
+                  currentBannerIndex === 1 ? "opacity-100" : "opacity-0"
+                }`}
+                style={{
+                  background:
+                    "linear-gradient(135deg, #f093fb 0%, #f5576c 50%, #4facfe 100%)",
+                }}
+              >
+                {/* 배경 원형 패턴 */}
+                <svg
+                  className="absolute inset-0 w-full h-full opacity-15"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle cx="50" cy="50" r="30" fill="white" />
+                  <circle cx="200" cy="100" r="40" fill="white" />
+                  <circle cx="350" cy="150" r="25" fill="white" />
+                  <circle cx="500" cy="80" r="35" fill="white" />
+                  <circle cx="150" cy="200" r="20" fill="white" />
+                  <circle cx="400" cy="250" r="30" fill="white" />
+                </svg>
+
+                {/* GitHub 로고 일러스트 */}
+                <div className="absolute top-8 right-8 w-40 h-40 md:w-56 md:h-56 opacity-25">
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    <path
+                      d="M 50 10 L 20 30 L 20 70 L 50 90 L 80 70 L 80 30 Z"
+                      fill="white"
+                    />
+                    <circle cx="50" cy="45" r="8" fill="none" stroke="#f5576c" strokeWidth="2" />
+                    <path
+                      d="M 50 53 L 50 65"
+                      stroke="#f5576c"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
+
+                {/* 알림 벨 일러스트 */}
+                <div className="absolute bottom-12 left-12 w-28 h-28 md:w-36 md:h-36 opacity-20">
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    <path
+                      d="M 50 20 L 50 20 L 30 20 Q 20 20 20 30 L 20 50 Q 20 60 30 60 L 50 60 L 50 80 L 60 80 L 60 60 L 70 60 Q 80 60 80 50 L 80 30 Q 80 20 70 20 Z"
+                      fill="white"
+                    />
+                    <circle cx="50" cy="40" r="3" fill="#f5576c" />
+                  </svg>
+                </div>
+
+                {/* 펄스 애니메이션 원 */}
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 md:w-96 md:h-96 opacity-10">
+                  <div className="absolute inset-0 rounded-full border-4 border-white animate-ping"></div>
+                </div>
+
+                <div className="absolute inset-0 flex items-center justify-center text-white p-8 z-10">
+                  <div className="text-center max-w-3xl">
+                    <div className="text-6xl md:text-7xl lg:text-8xl mb-4 animate-bounce">
+                      🔍
+                    </div>
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 drop-shadow-lg">
+                      실시간 PR 모니터링
+                    </h2>
+                    <p className="text-lg md:text-xl text-white/95 drop-shadow-md">
+                      GitHub PR을 자동으로 감지하고<br />
+                      즉시 테스트를 실행합니다
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 배너 3: 브라우저 자동화 테스트 */}
+              <div
+                className={`absolute inset-0 transition-opacity duration-1000 ${
+                  currentBannerIndex === 2 ? "opacity-100" : "opacity-0"
+                }`}
+                style={{
+                  background:
+                    "linear-gradient(135deg, #4facfe 0%, #00f2fe 50%, #43e97b 100%)",
+                }}
+              >
+                {/* 웹 브라우저 일러스트 */}
+                <div className="absolute top-8 right-8 w-48 h-48 md:w-64 md:h-64 opacity-25">
+                  <svg viewBox="0 0 200 200" className="w-full h-full">
+                    {/* 브라우저 창 */}
+                    <rect
+                      x="20"
+                      y="20"
+                      width="160"
+                      height="140"
+                      rx="8"
+                      fill="white"
+                      opacity="0.3"
+                    />
+                    {/* 주소창 */}
+                    <rect
+                      x="30"
+                      y="35"
+                      width="140"
+                      height="15"
+                      rx="3"
+                      fill="white"
+                      opacity="0.5"
+                    />
+                    {/* 탭 */}
+                    <rect
+                      x="25"
+                      y="25"
+                      width="50"
+                      height="8"
+                      rx="2"
+                      fill="white"
+                      opacity="0.4"
+                    />
+                    {/* 콘텐츠 영역 */}
+                    <rect
+                      x="30"
+                      y="60"
+                      width="140"
+                      height="90"
+                      rx="4"
+                      fill="white"
+                      opacity="0.2"
+                    />
+                    {/* 체크마크 */}
+                    <path
+                      d="M 80 100 L 95 115 L 130 80"
+                      stroke="white"
+                      strokeWidth="6"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+
+                {/* 코드 블록 일러스트 */}
+                <div className="absolute bottom-10 left-10 w-32 h-32 md:w-40 md:h-40 opacity-20">
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    <rect
+                      x="10"
+                      y="10"
+                      width="80"
+                      height="80"
+                      rx="4"
+                      fill="white"
+                      opacity="0.3"
+                    />
+                    <rect x="20" y="25" width="40" height="4" rx="2" fill="white" />
+                    <rect x="20" y="35" width="50" height="4" rx="2" fill="white" />
+                    <rect x="20" y="45" width="35" height="4" rx="2" fill="white" />
+                    <rect x="20" y="55" width="45" height="4" rx="2" fill="white" />
+                    <rect x="20" y="65" width="30" height="4" rx="2" fill="white" />
+                  </svg>
+                </div>
+
+                {/* 파도 패턴 */}
+                <svg
+                  className="absolute bottom-0 left-0 w-full h-32 opacity-20"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 1200 120"
+                  preserveAspectRatio="none"
+                >
+                  <path
+                    d="M0,60 Q300,20 600,60 T1200,60 L1200,120 L0,120 Z"
+                    fill="white"
+                  />
+                </svg>
+
+                {/* 반짝이는 별들 */}
+                <div className="absolute top-20 left-20 w-4 h-4 opacity-60">
+                  <svg viewBox="0 0 20 20" className="w-full h-full animate-pulse">
+                    <polygon
+                      points="10,2 12,8 18,8 13,12 15,18 10,14 5,18 7,12 2,8 8,8"
+                      fill="white"
+                    />
+                  </svg>
+                </div>
+                <div className="absolute top-32 right-32 w-3 h-3 opacity-50">
+                  <svg viewBox="0 0 20 20" className="w-full h-full animate-pulse" style={{ animationDelay: '0.5s' }}>
+                    <polygon
+                      points="10,2 12,8 18,8 13,12 15,18 10,14 5,18 7,12 2,8 8,8"
+                      fill="white"
+                    />
+                  </svg>
+                </div>
+                <div className="absolute bottom-24 right-24 w-5 h-5 opacity-40">
+                  <svg viewBox="0 0 20 20" className="w-full h-full animate-pulse" style={{ animationDelay: '1s' }}>
+                    <polygon
+                      points="10,2 12,8 18,8 13,12 15,18 10,14 5,18 7,12 2,8 8,8"
+                      fill="white"
+                    />
+                  </svg>
+                </div>
+
+                <div className="absolute inset-0 flex items-center justify-center text-white p-8 z-10">
+                  <div className="text-center max-w-3xl">
+                    <div className="text-6xl md:text-7xl lg:text-8xl mb-4 animate-spin" style={{ animationDuration: '20s' }}>
+                      🌐
+                    </div>
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 drop-shadow-lg">
+                      브라우저 자동화 테스트
+                    </h2>
+                    <p className="text-lg md:text-xl text-white/95 drop-shadow-md">
+                      Playwright와 Vision AI로<br />
+                      실제 사용자 경험을 검증합니다
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 인디케이터 */}
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 z-10">
+              {[0, 1, 2].map((index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentBannerIndex(index)}
+                  className={`w-3 h-3 rounded-full transition-all ${
+                    currentBannerIndex === index
+                      ? "bg-white w-8"
+                      : "bg-white/50 hover:bg-white/75"
+                  }`}
+                  aria-label={`배너 ${index + 1}로 이동`}
+                />
+              ))}
+            </div>
+
+            {/* 좌우 화살표 */}
+            <button
+              onClick={() =>
+                setCurrentBannerIndex((prev) => (prev - 1 + 3) % 3)
+              }
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/30 text-white p-2 rounded-full transition-all z-10"
+              aria-label="이전 배너"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={() =>
+                setCurrentBannerIndex((prev) => (prev + 1) % 3)
+              }
+              className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/20 hover:bg-white/30 text-white p-2 rounded-full transition-all z-10"
+              aria-label="다음 배너"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
+          </div>
+        </section>
+
         {/* 구독 목록 */}
         <section className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
@@ -533,38 +919,6 @@ function Home() {
                   </p>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    기본 배포 URL (선택사항)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="global.oliveyoung.com (비워두면 로컬 배포 사용)"
-                    value={formData.base_url}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        base_url: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    <span className="font-semibold text-blue-600">
-                      입력한 경우:
-                    </span>{" "}
-                    PR이 감지되면 자동으로{" "}
-                    <code className="bg-gray-100 px-1 rounded">
-                      pr-{"{번호}"}.{"{base_url}"}
-                    </code>{" "}
-                    형식으로 URL이 생성됩니다.
-                    <br />
-                    <span className="font-semibold text-purple-600">
-                      로컬 테스트:
-                    </span>{" "}
-                    이 필드를 비워두세요!
-                  </p>
-                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

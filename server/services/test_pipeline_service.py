@@ -26,55 +26,28 @@ class TestPipelineService:
             pr: GitHub PR 객체
             pr_diff: PR diff 정보
             branch_name: 브랜치 이름
-            base_url: 구독에 저장된 기본 URL (예: global.oliveyoung.com) - PR URL은 pr-{번호}.{base_url} 형식으로 자동 생성
+            base_url: 사용하지 않음 (항상 preview-dev.oliveyoung.com 사용)
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         pr_number = pr.number
         
         try:
             # 1. PR 배포 URL 결정
-            # 우선순위: base_url (구독에 저장된 기본 URL) > 로컬 배포 > K8s 배포 > skip
+            # preview 브랜치만 테스트 대상이므로 항상 preview-dev.oliveyoung.com 사용
             skip_deployment = False  # 기본값 설정
             
-            if base_url:
-                # 구독에 저장된 기본 URL로 PR URL 자동 생성
-                # pr-{번호}.{base_url} 형식
-                # https://, http://, 포트 번호 제거
-                base_url_clean = base_url.replace('https://', '').replace('http://', '').strip('/')
-                # 포트 번호 제거 (예: global.oliveyoung.com:8080 -> global.oliveyoung.com)
-                if ':' in base_url_clean:
-                    base_url_clean = base_url_clean.split(':')[0]
-                pr_url = f"pr-{pr_number}.{base_url_clean}"
-                pr_full_url = f"https://{pr_url}"
-                skip_deployment = True  # 배포는 이미 되어 있다고 가정
-                print(f"🌐 Using base URL from subscription: {base_url}")
-                print(f"   ✅ Generated PR URL: {pr_full_url}")
-            else:
-                # 배포 URL이 없으면 로컬 포트 할당 모드
-                deployment_mode = os.getenv('DEPLOYMENT_MODE', 'local_port')
-                if deployment_mode == 'local_port':
-                    # 5173 이후 포트 할당
-                    port_base = int(os.getenv('LOCAL_PORT_BASE', '5173'))
-                    pr_port = port_base + pr_number
-                    pr_url = f"localhost:{pr_port}"
-                    pr_full_url = f"http://{pr_url}"
-                    skip_deployment = True  # 배포는 이미 되어 있다고 가정
-                    print(f"🌐 Using local port allocation: {pr_full_url}")
-                    print(f"   Note: Make sure your app is running on port {pr_port}")
-                else:
-                    # 기본 localhost:5173 사용
-                    print(f"🌐 Using localhost:5173 for testing")
-                    pr_url = "localhost:5173"
-                    pr_full_url = f"http://{pr_url}"
-                    skip_deployment = True  # 배포는 이미 되어 있다고 가정
-                    print(f"   ✅ Using local URL: {pr_full_url}")
+            # preview 브랜치만 테스트 대상이므로 항상 고정된 URL 사용
+            pr_url = "preview-dev.oliveyoung.com"
+            pr_full_url = f"https://{pr_url}"
+            skip_deployment = True  # 배포는 이미 되어 있다고 가정
+            print(f"🌐 Using fixed preview URL for preview branch")
+            print(f"   ✅ Generated PR URL: {pr_full_url}")
             
             # 2. PR 분석 및 시나리오 생성
             print("📝 Analyzing PR with Gemini...")
-            analyzer = PRAnalyzerService(base_url=self.base_url)
-            # 배포를 건너뛴 경우 pr_url=None으로 전달하여 base_url 사용
-            test_pr_url_for_analysis = pr_url if not skip_deployment else None
-            scenarios = analyzer.analyze_and_generate_scenarios(pr_diff, pr_url=test_pr_url_for_analysis)
+            analyzer = PRAnalyzerService(base_url="preview-dev.oliveyoung.com")
+            # preview 브랜치는 항상 preview-dev.oliveyoung.com 사용
+            scenarios = analyzer.analyze_and_generate_scenarios(pr_diff, pr_url=pr_full_url)
             
             print(f"✓ Generated {len(scenarios)} test scenarios")
             
@@ -90,9 +63,8 @@ class TestPipelineService:
             test_results = []
             
             for scenario in scenarios:
-                # 배포를 건너뛴 경우 pr_url=None으로 전달하여 base_url 사용
-                test_pr_url = pr_url if not skip_deployment else None
-                result = executor.execute_scenario(scenario, pr_url=test_pr_url)
+                # preview 브랜치는 항상 preview-dev.oliveyoung.com 사용
+                result = executor.execute_scenario(scenario, pr_url=pr_full_url)
                 test_results.append(result)
             
             # 4. Vision API로 검증

@@ -175,14 +175,10 @@ class TestController:
                 }), 401
             
             # PR 배포 URL 생성
-            # subscription의 base_url 우선 사용, 없으면 로컬 모드 확인
-            if subscription and subscription.base_url:
-                base_url = subscription.base_url
-                pr_url = f"pr-{pr_number}.{base_url}"
-            else:
-                # base_url이 없으면 로컬 모드로 실행 (localhost:5173 사용)
-                pr_url = "localhost:5173"
-                base_url = None  # 로컬 모드에서는 base_url이 필요 없음
+            # preview 브랜치만 테스트 대상이므로 항상 preview-dev.oliveyoung.com 사용
+            pr_url = "preview-dev.oliveyoung.com"
+            pr_full_url = f"https://{pr_url}"
+            base_url = None  # preview 브랜치는 고정 URL 사용
             
             # 시나리오 재실행
             pipeline_service = TestPipelineService(base_url=base_url or os.getenv('BASE_URL', 'localhost:5173'))
@@ -315,59 +311,16 @@ class TestController:
             pr_diff = pipeline_service.get_pr_diff(pr)
             
             # PR 배포 URL 생성
-            pr_url = None
-            base_url = subscription.base_url
-            deployment_mode = os.getenv('DEPLOYMENT_MODE', 'local_port')
-            
-            if subscription.base_url:
-                # 구독에 base_url이 있으면 PR URL 자동 생성
-                base_url_clean = subscription.base_url.replace('https://', '').replace('http://', '').strip('/')
-                if ':' in base_url_clean:
-                    base_url_clean = base_url_clean.split(':')[0]
-                pr_url = f"pr-{test.pr_number}.{base_url_clean}"
-                print(f"🌐 Using base URL from subscription: {pr_url}")
-            elif deployment_mode == 'local':
-                # 로컬 배포 모드: PR 브랜치를 체크아웃하고 별도 포트로 실행
-                from ..services.local_deployer import LocalDeployer
-                try:
-                    local_deployer = LocalDeployer()
-                    deployment_info = local_deployer.deploy_pr(
-                        pr_number=test.pr_number,
-                        repo_name=test.repo_full_name,
-                        branch_name=test.branch_name,
-                        repo_url=None  # GitHub에서 자동 생성
-                    )
-                    pr_url = deployment_info['url']  # 예: localhost:8001
-                    print(f"🚀 PR #{test.pr_number} deployed locally at {pr_url}")
-                except Exception as deploy_err:
-                    print(f"⚠️ Local deployment failed: {deploy_err}")
-                    print(f"   Falling back to local port allocation")
-                    # 폴백: 5173 이후 포트 할당
-                    port_base = int(os.getenv('LOCAL_PORT_BASE', '5173'))
-                    pr_port = port_base + test.pr_number
-                    pr_url = f"localhost:{pr_port}"
-                    base_url = None
-                    print(f"   Using localhost:{pr_port}")
-            elif deployment_mode == 'local_port':
-                # 간단한 로컬 포트 할당 모드: 5173 이후 포트 사용
-                port_base = int(os.getenv('LOCAL_PORT_BASE', '5173'))
-                pr_port = port_base + test.pr_number
-                pr_url = f"localhost:{pr_port}"
-                base_url = None
-                print(f"🌐 Using local port allocation: {pr_url}")
-                print(f"   PR #{test.pr_number} will use port {pr_port} (base: {port_base} + PR: {test.pr_number})")
-                print(f"   Note: Make sure your app is running on port {pr_port}")
-            else:
-                # 배포 모드가 skip이거나 base_url이 없으면 기존 localhost:5173 사용
-                pr_url = "localhost:5173"
-                base_url = None
-                print(f"🌐 Using default localhost:5173 (no deployment)")
+            # preview 브랜치만 테스트 대상이므로 항상 preview-dev.oliveyoung.com 사용
+            pr_url = "preview-dev.oliveyoung.com"
+            pr_full_url = f"https://{pr_url}"
+            print(f"🌐 Using fixed preview URL for preview branch: {pr_full_url}")
             
             # 시나리오 재생성
             from ..services.pr_analyzer_service import PRAnalyzerService
-            analyzer = PRAnalyzerService(base_url=base_url)
+            analyzer = PRAnalyzerService(base_url=None)
             try:
-                scenarios = analyzer.analyze_and_generate_scenarios(pr_diff, pr_url=pr_url)
+                scenarios = analyzer.analyze_and_generate_scenarios(pr_diff, pr_url=pr_full_url)
             except ValueError as e:
                 # API 키 관련 에러 등 명시적인 에러
                 return jsonify({
@@ -387,7 +340,7 @@ class TestController:
             try:
                 execution_results = pipeline_service.run_existing_scenarios(
                     scenarios,
-                    pr_url=pr_url
+                    pr_url=pr_full_url
                 )
             except Exception as exec_err:
                 test.status = 'failed'

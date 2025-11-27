@@ -41,7 +41,7 @@ class SubscriptionController:
         slack_notify = data.get('slack_notify', True)
         exclude_branches = data.get('exclude_branches')  # 제외할 브랜치 목록
         test_options = data.get('test_options', {})
-        base_url = data.get('base_url')  # 기본 배포 URL (예: global.oliveyoung.com) - PR URL은 pr-{번호}.{base_url} 형식으로 자동 생성
+        # preview 브랜치만 테스트 대상이므로 base_url은 사용하지 않음 (항상 preview-dev.oliveyoung.com 사용)
         
         if not repo_full_name:
             return jsonify({
@@ -54,8 +54,6 @@ class SubscriptionController:
                 'success': False,
                 'error': 'pat (Personal Access Token) is required'
             }), 400
-        
-        # base_url은 선택사항 (비워두면 로컬 배포 사용)
         
         try:
             # 제외할 브랜치 목록 처리 (기본값: ['main'])
@@ -72,7 +70,7 @@ class SubscriptionController:
                 slack_notify=slack_notify,
                 exclude_branches=exclude_branches_list,
                 test_options=test_options,
-                base_url=base_url
+                base_url=None  # base_url은 사용하지 않음
             )
             
             if result['success']:
@@ -92,28 +90,93 @@ class SubscriptionController:
             }), 500
     
     def get_subscription(self, subscription_id):
-        """특정 구독 정보 조회"""
+        """특정 구독 정보 조회 (모든 PR 목록 포함)"""
         user_id = request.args.get('user_id', 'default')
         
+        db = next(get_db())
         try:
-            subscriptions = self.service.get_subscriptions(user_id)
-            subscription = next((s for s in subscriptions if s['id'] == subscription_id), None)
+            subscription = db.query(Subscription).filter(
+                Subscription.id == subscription_id,
+                Subscription.user_id == user_id,
+                Subscription.is_active == True
+            ).first()
             
-            if subscription:
-                return jsonify({
-                    'success': True,
-                    'subscription': subscription
-                }), 200
-            else:
+            if not subscription:
                 return jsonify({
                     'success': False,
                     'error': 'Subscription not found'
                 }), 404
+            
+            subscription_dict = self.service._subscription_to_dict(subscription)
+            
+            # GitHub에서 모든 PR 목록 가져오기 (테스트 대상/미대상 분리)
+            all_prs = []
+            non_target_prs = []
+            
+            try:
+                # PAT 가져오기
+                pat = None
+                if subscription.user_credential_id:
+                    credential = self.polling_service.pat_auth.get_credential_by_id(subscription.user_credential_id)
+                    if credential:
+                        pat = self.polling_service.pat_auth.get_decrypted_pat(credential.user_id)
+                
+                # GitHub API로 PR 목록 가져오기
+                from github import Github
+                if pat:
+                    g = Github(pat)
+                else:
+                    g = Github()
+                
+                repo = g.get_repo(subscription.repo_full_name)
+                pulls = repo.get_pulls(state='open', sort='updated', direction='desc')
+                
+                for pr in pulls:
+                    pr_info = {
+                        'number': pr.number,
+                        'title': pr.title,
+                        'branch': pr.head.ref,
+                        'url': pr.html_url,
+                        'created_at': pr.created_at.isoformat() if pr.created_at else None,
+                        'updated_at': pr.updated_at.isoformat() if pr.updated_at else None,
+                    }
+                    
+                    # 테스트 대상 확인: 정확히 "preview" 브랜치
+                    if pr.head.ref == "preview":
+                        all_prs.append(pr_info)
+                    else:
+                        # 제외 브랜치가 아닌 경우만 미대상 목록에 추가
+                        exclude_branches = subscription.exclude_branches or ['main']
+                        should_exclude = False
+                        for exclude_branch in exclude_branches:
+                            if exclude_branch.endswith('*'):
+                                pattern = exclude_branch.replace('*', '')
+                                if pr.head.ref.startswith(pattern):
+                                    should_exclude = True
+                                    break
+                            elif pr.head.ref == exclude_branch:
+                                should_exclude = True
+                                break
+                        
+                        if not should_exclude:
+                            non_target_prs.append(pr_info)
+            except Exception as e:
+                print(f"⚠️ Failed to fetch PRs from GitHub: {e}")
+                # 에러가 발생해도 구독 정보는 반환
+            
+            return jsonify({
+                'success': True,
+                'subscription': subscription_dict,
+                'target_prs': all_prs,  # 테스트 대상 PR (preview 브랜치)
+                'non_target_prs': non_target_prs  # 테스트 미대상 PR
+            }), 200
         except Exception as e:
             return jsonify({
                 'success': False,
                 'error': str(e)
             }), 500
+        finally:
+            db.close()
     
     def delete_subscription(self, subscription_id):
         """구독 삭제"""
@@ -159,12 +222,13 @@ class SubscriptionController:
             
             # 즉시 polling 실행
             try:
-                detected_count, detected_pr_list = self.polling_service._poll_subscription(subscription)
+                detected_count, detected_pr_list, non_target_pr_list = self.polling_service._poll_subscription(subscription)
                 return jsonify({
                     'success': True,
                     'message': f'Polling completed for {subscription.repo_full_name}',
                     'detected_prs': detected_count,
-                    'pr_list': detected_pr_list
+                    'pr_list': detected_pr_list,  # 테스트 대상 PR (preview 브랜치)
+                    'non_target_pr_list': non_target_pr_list  # 테스트 미대상 PR
                 }), 200
             except Exception as e:
                 error_msg = str(e)

@@ -10,6 +10,7 @@ function RepositoryDetail() {
   const navigate = useNavigate();
   const [subscription, setSubscription] = useState(null);
   const [prs, setPrs] = useState([]);
+  const [nonTargetPrs, setNonTargetPrs] = useState([]); // 테스트 미대상 PR 목록
   const [loading, setLoading] = useState(true);
   const [showPATModal, setShowPATModal] = useState(false);
   const [patInput, setPatInput] = useState("");
@@ -20,14 +21,15 @@ function RepositoryDetail() {
   useEffect(() => {
     fetchSubscription();
     fetchPRs();
-    
+
     // 주기적으로 PR 목록 새로고침 (분석 중인 PR 상태 업데이트)
+    // 로딩 표시 없이 조용히 업데이트
     const interval = setInterval(() => {
-      fetchPRs();
-    }, 3000); // 3초마다 새로고침
-    
+      fetchPRsSilently();
+    }, 5000); // 5초마다 새로고침 (간격을 늘려서 부하 감소)
+
     setPollingInterval(interval);
-    
+
     return () => {
       if (interval) {
         clearInterval(interval);
@@ -45,15 +47,24 @@ function RepositoryDetail() {
       );
       if (response.data.success) {
         setSubscription(response.data.subscription);
+        // 테스트 미대상 PR 목록 설정
+        if (response.data.non_target_prs) {
+          setNonTargetPrs(response.data.non_target_prs);
+        }
+        setLoading(false); // 구독 정보 로딩 완료
+      } else {
+        // 응답은 성공했지만 데이터가 없는 경우
+        setLoading(false);
       }
     } catch (error) {
       console.error("구독 정보 조회 실패:", error);
+      setLoading(false); // 에러 발생 시에도 로딩 종료
     }
   };
 
-  const fetchPRs = async () => {
+  const fetchPRs = async (showLoading = false) => {
+    // PR 목록은 조용히 업데이트 (로딩 표시 안 함)
     try {
-      setLoading(true);
       const response = await axios.get(`${API_BASE_URL}/api/tests`, {
         params: {
           user_id: "user123",
@@ -73,14 +84,17 @@ function RepositoryDetail() {
             prMap.set(key, test);
           }
         });
-        setPrs(
-          Array.from(prMap.values()).sort((a, b) => b.pr_number - a.pr_number)
+        // 브랜치명이 정확히 "preview"인 PR만 테스트 대상으로 필터링
+        const allTests = Array.from(prMap.values()).sort(
+          (a, b) => b.pr_number - a.pr_number
         );
+        const targetTests = allTests.filter(
+          (test) => test.branch_name === "preview"
+        );
+        setPrs(targetTests);
       }
     } catch (error) {
       console.error("PR 목록 조회 실패:", error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -213,12 +227,49 @@ function RepositoryDetail() {
     );
   }
 
+  // 로딩 중일 때는 로딩 스피너 표시
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
+        <Header />
+        <div className="max-w-7xl mx-auto p-8">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+              <p className="text-gray-600 text-lg font-medium">
+                구독 정보를 불러오는 중...
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 로딩이 완료되었지만 구독 정보가 없는 경우에만 에러 메시지 표시
   if (!subscription) {
     return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center text-red-600">
-            구독 정보를 찾을 수 없습니다.
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
+        <Header />
+        <div className="max-w-7xl mx-auto p-8">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center">
+              <div className="inline-block bg-red-100 rounded-full p-6 mb-4">
+                <span className="text-4xl">⚠️</span>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                구독 정보를 찾을 수 없습니다
+              </h2>
+              <p className="text-gray-600 mb-6">
+                요청하신 구독 정보가 존재하지 않거나 삭제되었습니다.
+              </p>
+              <button
+                onClick={() => navigate("/")}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
+              >
+                홈으로 돌아가기
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -240,72 +291,60 @@ function RepositoryDetail() {
             </span>
             <span>뒤로 가기</span>
           </button>
-          <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl p-8 text-white">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3">
-                    <span className="text-3xl">📦</span>
-                  </div>
-                  <div>
-                    <h1 className="text-3xl font-bold mb-1">
-                      {subscription.repo_full_name}
-                    </h1>
-                    <p className="text-blue-100 text-sm">Repository Details</p>
-                  </div>
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl p-8 text-white relative">
+            {/* PAT 버튼을 절대 위치로 배치 */}
+            <div className="absolute top-8 right-8">
+              {subscription.user_credential_id ? (
+                <div className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold shadow-lg flex items-center gap-2">
+                  <span>✅</span>
+                  <span>
+                    PAT가 연결되어 있습니다 (Rate Limit: 5,000회/시간)
+                  </span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+              ) : (
+                <button
+                  onClick={() => setShowPATModal(true)}
+                  className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
+                >
+                  <span>🔑</span>
+                  <span>PAT 추가 (Rate Limit 증가)</span>
+                </button>
+              )}
+            </div>
+
+            <div className="w-full">
+              <div className="mb-4">
+                <h1 className="text-3xl font-bold mb-1">
+                  {subscription.repo_full_name}
+                </h1>
+                <p className="text-blue-100 text-sm">Repository Details</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 w-full">
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
+                  <p className="text-blue-100 text-xs mb-1">생성일</p>
+                  <p className="text-white font-semibold">
+                    {new Date(subscription.created_at).toLocaleDateString(
+                      "ko-KR"
+                    )}
+                  </p>
+                </div>
+                {subscription.exclude_branches && (
                   <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                    <p className="text-blue-100 text-xs mb-1">생성일</p>
+                    <p className="text-blue-100 text-xs mb-1">제외 브랜치</p>
                     <p className="text-white font-semibold">
-                      {new Date(subscription.created_at).toLocaleDateString(
-                        "ko-KR"
-                      )}
+                      {subscription.exclude_branches.join(", ")}
                     </p>
                   </div>
-                  {subscription.exclude_branches && (
-                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                      <p className="text-blue-100 text-xs mb-1">제외 브랜치</p>
-                      <p className="text-white font-semibold">
-                        {subscription.exclude_branches.join(", ")}
-                      </p>
-                    </div>
-                  )}
-                  {subscription.base_url && (
-                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                      <p className="text-blue-100 text-xs mb-1">
-                        기본 배포 URL
-                      </p>
-                      <p className="text-white font-semibold">
-                        {subscription.base_url}
-                      </p>
-                      <p className="text-blue-100 text-xs mt-2">
-                        💡 PR URL 형식:{" "}
-                        <code className="bg-white/20 px-1 rounded">
-                          pr-{"{번호}"}.{subscription.base_url}
-                        </code>
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="mt-4">
-                {subscription.user_credential_id ? (
-                  <div className="px-4 py-2 bg-green-500 text-white rounded-lg font-semibold shadow-lg flex items-center gap-2">
-                    <span>✅</span>
-                    <span>
-                      PAT가 연결되어 있습니다 (Rate Limit: 5,000회/시간)
-                    </span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowPATModal(true)}
-                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
-                  >
-                    <span>🔑</span>
-                    <span>PAT 추가 (Rate Limit 증가)</span>
-                  </button>
                 )}
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20 md:col-span-2 w-full">
+                  <p className="text-blue-100 text-xs mb-1">테스트 URL</p>
+                  <p className="text-white font-semibold text-lg">
+                    https://preview-dev.oliveyoung.com
+                  </p>
+                  <p className="text-blue-100 text-xs mt-2">
+                    💡 preview 브랜치의 모든 PR은 동일한 URL로 테스트됩니다.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -324,7 +363,8 @@ function RepositoryDetail() {
                     Pull Requests
                   </h2>
                   <p className="text-sm text-gray-600">
-                    총 {prs.length}개의 PR이 감지되었습니다
+                    테스트 대상: {prs.length}개 | 테스트 미대상:{" "}
+                    {nonTargetPrs.length}개
                   </p>
                 </div>
               </div>
@@ -352,7 +392,7 @@ function RepositoryDetail() {
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               <p className="mt-4 text-gray-500">로딩 중...</p>
             </div>
-          ) : prs.length === 0 ? (
+          ) : prs.length === 0 && nonTargetPrs.length === 0 ? (
             <div className="p-12 text-center">
               <div className="inline-block bg-gray-100 rounded-full p-6 mb-4">
                 <span className="text-4xl">📭</span>
@@ -365,52 +405,141 @@ function RepositoryDetail() {
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
-              {prs.map((pr, index) => (
-                <div
-                  key={pr.id}
-                  onClick={() => {
-                    // running 또는 pending 상태일 때는 디테일 페이지 접근 제한
-                    if (pr.status === 'running' || pr.status === 'pending') {
-                      alert(`⏳ AI 분석이 진행 중입니다.\n\nPR #${pr.pr_number}의 분석이 완료되면 디테일 페이지를 확인할 수 있습니다.\n\n현재 상태: ${pr.status === 'running' ? '🔄 실행 중' : '⏳ 대기'}`);
-                      return;
-                    }
-                    navigate(`/subscriptions/${subscriptionId}/prs/${pr.id}`);
-                  }}
-                  className={`p-6 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 transition-all duration-200 group ${
-                    pr.status === 'running' || pr.status === 'pending' 
-                      ? 'cursor-wait opacity-75' 
-                      : 'cursor-pointer'
-                  }`}
-                  style={{ animationDelay: `${index * 50}ms` }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-4 mb-3">
-                        <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl p-3 text-white font-bold text-lg shadow-lg">
-                          #{pr.pr_number}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-1">
-                            <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                              {pr.pr_title || `PR #${pr.pr_number}`}
-                            </h3>
-                            {getStatusBadge(pr.status)}
+            <div>
+              {/* 테스트 대상 PR 섹션 */}
+              {prs.length > 0 && (
+                <div className="mb-8">
+                  <div className="flex items-center gap-2 mb-4 px-6 pt-6">
+                    <span className="text-2xl">✅</span>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      테스트 대상 PR ({prs.length})
+                    </h2>
+                    <span className="text-sm text-gray-500 bg-blue-100 px-2 py-1 rounded">
+                      preview 브랜치
+                    </span>
+                  </div>
+                  <div className="divide-y divide-gray-100 bg-white rounded-lg shadow-sm">
+                    {prs.map((pr, index) => (
+                      <div
+                        key={pr.id}
+                        onClick={() => {
+                          // running 또는 pending 상태일 때는 디테일 페이지 접근 제한
+                          if (
+                            pr.status === "running" ||
+                            pr.status === "pending"
+                          ) {
+                            alert(
+                              `⏳ AI 분석이 진행 중입니다.\n\nPR #${
+                                pr.pr_number
+                              }의 분석이 완료되면 디테일 페이지를 확인할 수 있습니다.\n\n현재 상태: ${
+                                pr.status === "running"
+                                  ? "🔄 실행 중"
+                                  : "⏳ 대기"
+                              }`
+                            );
+                            return;
+                          }
+                          navigate(
+                            `/subscriptions/${subscriptionId}/prs/${pr.id}`
+                          );
+                        }}
+                        className={`p-6 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 transition-all duration-200 group ${
+                          pr.status === "running" || pr.status === "pending"
+                            ? "cursor-wait opacity-75"
+                            : "cursor-pointer"
+                        }`}
+                        style={{ animationDelay: `${index * 50}ms` }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-4 mb-3">
+                              <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl p-3 text-white font-bold text-lg shadow-lg">
+                                #{pr.pr_number}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-1">
+                                  <h3 className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                                    {pr.pr_title || `PR #${pr.pr_number}`}
+                                  </h3>
+                                  {getStatusBadge(pr.status)}
+                                </div>
+                                {pr.branch_name && (
+                                  <p className="text-sm text-gray-600 font-medium">
+                                    🌿 {pr.branch_name}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          {pr.branch_name && (
-                            <p className="text-sm text-gray-600 font-medium">
-                              🌿 {pr.branch_name}
-                            </p>
-                          )}
+                          <div className="ml-4 text-blue-600 group-hover:translate-x-1 transition-transform text-2xl">
+                            →
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="ml-4 text-blue-600 group-hover:translate-x-1 transition-transform text-2xl">
-                      →
-                    </div>
+                    ))}
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* 테스트 미대상 PR 섹션 */}
+              {nonTargetPrs.length > 0 && (
+                <div className="mt-8">
+                  <div className="flex items-center gap-2 mb-4 px-6 pt-6">
+                    <span className="text-2xl">⏸️</span>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      테스트 미대상 PR ({nonTargetPrs.length})
+                    </h2>
+                    <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                      preview 브랜치 아님
+                    </span>
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 mx-6">
+                    <p className="text-sm text-yellow-800">
+                      💡 <strong>참고:</strong> 이 PR들은 현재 테스트 대상이
+                      아닙니다. 브랜치명이 정확히{" "}
+                      <code className="bg-yellow-100 px-1 rounded">
+                        preview
+                      </code>
+                      인 PR만 테스트됩니다.
+                      <br />
+                      추후 배포 환경이 구성되면 테스트 기능이 추가될 예정입니다.
+                    </p>
+                  </div>
+                  <div className="divide-y divide-gray-100 opacity-75">
+                    {nonTargetPrs.map((pr, index) => (
+                      <div
+                        key={pr.number}
+                        className="p-6 hover:bg-gray-50 transition-all duration-200"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-4 mb-3">
+                              <div className="bg-gray-400 rounded-xl p-3 text-white font-bold text-lg shadow-lg">
+                                #{pr.number}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-1">
+                                  <h3 className="text-lg font-bold text-gray-700">
+                                    {pr.title || `PR #${pr.number}`}
+                                  </h3>
+                                  <span className="px-3 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700">
+                                    ⏸️ 테스트 미대상
+                                  </span>
+                                </div>
+                                {pr.branch && (
+                                  <p className="text-sm text-gray-600 font-medium">
+                                    🌿 {pr.branch}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

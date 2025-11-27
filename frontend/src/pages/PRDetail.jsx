@@ -12,17 +12,18 @@ function PRDetail() {
   const [loading, setLoading] = useState(true);
   const [rerunningScenarios, setRerunningScenarios] = useState(new Set());
   const [regeneratingScenarios, setRegeneratingScenarios] = useState(false);
+  const [expandedScenarios, setExpandedScenarios] = useState(new Set());
 
   useEffect(() => {
     fetchTestDetail();
-    
+
     // running 또는 pending 상태일 때 주기적으로 상태 확인
     const interval = setInterval(() => {
-      if (test && (test.status === 'running' || test.status === 'pending')) {
+      if (test && (test.status === "running" || test.status === "pending")) {
         fetchTestDetail();
       }
     }, 2000); // 2초마다 확인
-    
+
     return () => {
       clearInterval(interval);
     };
@@ -58,15 +59,31 @@ function PRDetail() {
       running: "🔄 실행 중",
       pending: "⏳ 대기",
     };
+
+    // status가 없거나 undefined인 경우 기본값 처리
+    const normalizedStatus = status ? status.toLowerCase() : "pending";
+
     return (
       <span
-        className={`px-6 py-2 text-sm font-bold rounded-full ${
-          styles[status] || styles.pending
+        className={`px-6 py-2.5 text-sm font-bold rounded-full whitespace-nowrap ${
+          styles[normalizedStatus] || styles.pending
         }`}
       >
-        {labels[status] || "⏳ 대기"}
+        {labels[normalizedStatus] || "⏳ 대기"}
       </span>
     );
+  };
+
+  const toggleScenario = (idx) => {
+    setExpandedScenarios((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(idx)) {
+        newSet.delete(idx);
+      } else {
+        newSet.add(idx);
+      }
+      return newSet;
+    });
   };
 
   const renderTestResults = (results) => {
@@ -83,93 +100,137 @@ function PRDetail() {
 
     if (Array.isArray(results)) {
       return (
-        <div className="space-y-4">
-          {results.map((scenario, idx) => (
-            <div
-              key={idx}
-              className="border-2 border-gray-200 rounded-xl p-6 bg-white shadow-md hover:shadow-lg transition-shadow"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg p-2 text-white font-bold">
-                  {idx + 1}
-                </div>
-                <h4 className="font-bold text-lg text-gray-900">
-                  시나리오 {idx + 1}
-                </h4>
-              </div>
-              {scenario.description && (
-                <div className="bg-blue-50 rounded-lg p-3 mb-4 border-l-4 border-blue-500">
-                  <p className="text-sm text-gray-700 font-medium">
-                    {scenario.description}
-                  </p>
-                </div>
-              )}
-              {scenario.actions && (
-                <div className="mb-4">
-                  <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
-                    액션 목록
-                  </p>
-                  <div className="grid gap-2">
-                    {scenario.actions.map((action, aidx) => (
-                      <div
-                        key={aidx}
-                        className="bg-gray-50 rounded-lg p-3 flex items-center gap-2 border border-gray-200"
-                      >
-                        <span className="bg-blue-100 text-blue-700 rounded px-2 py-1 text-xs font-bold">
-                          {action.type}
-                        </span>
-                        <span className="text-sm text-gray-700">
-                          {action.selector || action.url || action.value}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                <div className="flex items-center gap-4">
-                {scenario.success !== undefined && (
-                  <div
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold ${
-                      scenario.success
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                      <span className="text-lg">
-                        {scenario.success ? "✅" : "❌"}
-                      </span>
-                    <span>{scenario.success ? "성공" : "실패"}</span>
-                  </div>
-                )}
-                {scenario.error && (
-                  <div className="flex-1 bg-red-50 border-l-4 border-red-500 rounded p-3">
-                      <p className="text-sm text-red-700 font-medium">
-                        오류: {scenario.error}
-                      </p>
-                  </div>
-                )}
-                </div>
+        <div className="space-y-3">
+          {results.map((scenario, idx) => {
+            const isExpanded = expandedScenarios.has(idx);
+            return (
+              <div
+                key={idx}
+                className="border-2 border-gray-200 rounded-xl bg-white shadow-md hover:shadow-lg transition-all overflow-hidden"
+              >
+                {/* 드롭다운 헤더 */}
                 <button
-                  onClick={() => handleRerunScenario(idx)}
-                  disabled={rerunningScenarios.has(idx)}
-                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  onClick={() => toggleScenario(idx)}
+                  className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
                 >
-                  {rerunningScenarios.has(idx) ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>재실행 중...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>🔄</span>
-                      <span>재테스트</span>
-                    </>
-                  )}
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg p-2 text-white font-bold min-w-[40px] text-center">
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-bold text-lg text-gray-900 mb-1">
+                        시나리오 {idx + 1}
+                      </h4>
+                      {scenario.description && (
+                        <p className="text-sm text-gray-600 line-clamp-1">
+                          {scenario.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {scenario.success !== undefined && (
+                        <div
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-semibold text-sm ${
+                            scenario.success
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          <span className="text-base">
+                            {scenario.success ? "✅" : "❌"}
+                          </span>
+                          <span>{scenario.success ? "성공" : "실패"}</span>
+                        </div>
+                      )}
+                      <div
+                        className={`transform transition-transform duration-200 ${
+                          isExpanded ? "rotate-180" : ""
+                        }`}
+                      >
+                        <svg
+                          className="w-6 h-6 text-gray-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
                 </button>
+
+                {/* 드롭다운 내용 */}
+                {isExpanded && (
+                  <div className="px-6 pb-6 border-t border-gray-100 pt-4 space-y-4 animate-fadeIn">
+                    {scenario.description && (
+                      <div className="bg-blue-50 rounded-lg p-3 border-l-4 border-blue-500">
+                        <p className="text-sm text-gray-700 font-medium">
+                          {scenario.description}
+                        </p>
+                      </div>
+                    )}
+                    {scenario.actions && (
+                      <div>
+                        <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
+                          액션 목록
+                        </p>
+                        <div className="grid gap-2">
+                          {scenario.actions.map((action, aidx) => (
+                            <div
+                              key={aidx}
+                              className="bg-gray-50 rounded-lg p-3 flex items-center gap-2 border border-gray-200"
+                            >
+                              <span className="bg-blue-100 text-blue-700 rounded px-2 py-1 text-xs font-bold">
+                                {action.type}
+                              </span>
+                              <span className="text-sm text-gray-700">
+                                {action.selector || action.url || action.value}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {scenario.error && (
+                      <div className="bg-red-50 border-l-4 border-red-500 rounded p-3">
+                        <p className="text-sm text-red-700 font-medium">
+                          오류: {scenario.error}
+                        </p>
+                      </div>
+                    )}
+                    <div className="flex justify-end pt-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRerunScenario(idx);
+                        }}
+                        disabled={rerunningScenarios.has(idx)}
+                        className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {rerunningScenarios.has(idx) ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>재실행 중...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>🔄</span>
+                            <span>재테스트</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       );
     }
@@ -287,7 +348,7 @@ function PRDetail() {
   }
 
   // running 또는 pending 상태일 때 로딩 화면 표시
-  if (test.status === 'running' || test.status === 'pending') {
+  if (test.status === "running" || test.status === "pending") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
         <Header />
@@ -295,15 +356,17 @@ function PRDetail() {
           <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
             <div className="inline-block animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mb-6"></div>
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              {test.status === 'running' ? '🔄 AI 분석 진행 중...' : '⏳ 대기 중...'}
+              {test.status === "running"
+                ? "🔄 AI 분석 진행 중..."
+                : "⏳ 대기 중..."}
             </h2>
             <p className="text-gray-600 mb-2">
-              PR #{test.pr_number}: {test.pr_title || '제목 없음'}
+              PR #{test.pr_number}: {test.pr_title || "제목 없음"}
             </p>
             <p className="text-sm text-gray-500">
-              {test.status === 'running' 
-                ? 'Gemini AI가 PR 변경사항을 분석하고 테스트 시나리오를 생성하고 있습니다.'
-                : '테스트 실행을 대기 중입니다.'}
+              {test.status === "running"
+                ? "Gemini AI가 PR 변경사항을 분석하고 테스트 시나리오를 생성하고 있습니다."
+                : "테스트 실행을 대기 중입니다."}
             </p>
             <p className="text-xs text-gray-400 mt-4">
               분석이 완료되면 자동으로 결과가 표시됩니다...
@@ -345,9 +408,7 @@ function PRDetail() {
                     <p className="text-purple-100">Pull Request Test Details</p>
                   </div>
                 </div>
-                <div className="transform scale-110">
-                  {getStatusBadge(test.status)}
-                </div>
+                <div>{getStatusBadge(test.status)}</div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                 {test.branch_name && (
@@ -356,7 +417,7 @@ function PRDetail() {
                       브랜치
                     </p>
                     <p className="text-white font-semibold text-lg">
-                      🌿 {test.branch_name}
+                      {test.branch_name}
                     </p>
                   </div>
                 )}
@@ -373,6 +434,23 @@ function PRDetail() {
                     {test.pr_url}
                   </a>
                 </div>
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 md:col-span-2">
+                  <p className="text-purple-100 text-xs mb-1 font-medium">
+                    배포 경로
+                  </p>
+                  <a
+                    href="https://preview-dev.oliveyoung.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white font-semibold text-lg hover:text-purple-200 transition-colors underline block"
+                  >
+                    https://preview-dev.oliveyoung.com
+                  </a>
+                  <p className="text-purple-100 text-xs mt-2">
+                    💡 preview 브랜치의 모든 PR은 동일한 배포 경로로
+                    테스트됩니다.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -382,10 +460,10 @@ function PRDetail() {
         <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl p-3">
-              <span className="text-2xl">📊</span>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900">테스트 결과</h2>
+              <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl p-3">
+                <span className="text-2xl">📊</span>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">테스트 결과</h2>
             </div>
             <button
               onClick={handleRegenerateScenarios}

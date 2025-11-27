@@ -89,9 +89,7 @@ class SubscriptionService:
                 # 기본값: main만 제외
                 existing.exclude_branches = exclude_branches if exclude_branches is not None else ['main']
                 existing.test_options = test_options or {}
-                # 기본 URL 업데이트 (제공된 경우)
-                if base_url is not None:
-                    existing.base_url = base_url
+                # base_url은 사용하지 않음 (항상 preview-dev.oliveyoung.com 사용)
                 # PAT가 제공된 경우 credential_id 업데이트 (없던 경우 추가, 있던 경우 교체)
                 if credential_id is not None:
                     existing.user_credential_id = credential_id
@@ -119,7 +117,7 @@ class SubscriptionService:
                     # 기본값: main만 제외
                     exclude_branches=exclude_branches if exclude_branches is not None else ['main'],
                     test_options=test_options or {},
-                    base_url=base_url,
+                    base_url=None,  # base_url은 사용하지 않음 (항상 preview-dev.oliveyoung.com 사용)
                     is_active=True,
                     last_polled_at=datetime.utcnow()
                 )

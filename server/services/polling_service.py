@@ -35,7 +35,7 @@ class PollingService:
         """특정 구독에 대해 PR 확인
         
         Returns:
-            tuple: (감지된 PR 개수, 감지된 PR 목록)
+            tuple: (감지된 PR 개수, 감지된 PR 목록, 테스트 미대상 PR 목록)
         """
         print(f"  📦 Checking {subscription.repo_full_name}...")
         
@@ -74,6 +74,7 @@ class PollingService:
             
             new_prs = []
             updated_prs = []
+            non_target_prs = []  # 테스트 미대상 PR 목록
             
             # 제외할 브랜치 목록 (기본값: main)
             exclude_branches = subscription.exclude_branches or ['main']
@@ -94,6 +95,9 @@ class PollingService:
                 
                 print(f"    🔍 Checking PR #{pr.number}: {pr.title[:50]}... (branch: {pr.head.ref})")
                 
+                # 테스트 대상 브랜치 확인: 정확히 "preview"인 경우만 테스트 대상
+                is_test_target = pr.head.ref == "preview"
+                
                 # 제외할 브랜치인지 확인
                 should_exclude = False
                 
@@ -112,6 +116,13 @@ class PollingService:
                 # 제외할 브랜치면 스킵
                 if should_exclude:
                     print(f"      ⏭️ Skipping PR #{pr.number} (excluded branch: {pr.head.ref})")
+                    continue
+                
+                # 테스트 대상이 아닌 경우 (preview 브랜치가 아닌 경우)
+                if not is_test_target:
+                    print(f"      ⏸️ PR #{pr.number} is not a test target (branch: {pr.head.ref}, required: 'preview')")
+                    # 테스트 미대상 PR 목록에 추가
+                    non_target_prs.append(pr)
                     continue
                 
                 # 첫 polling이거나 PR이 since 이후에 생성/업데이트된 경우
@@ -144,7 +155,7 @@ class PollingService:
             all_prs = new_prs + updated_prs
             detected_count = len(all_prs)
             
-            # 감지된 PR 정보 수집
+            # 감지된 PR 정보 수집 (테스트 대상)
             detected_pr_list = []
             for pr in all_prs:
                 detected_pr_list.append({
@@ -153,7 +164,21 @@ class PollingService:
                     'branch': pr.head.ref,
                     'url': pr.html_url,
                     'created_at': pr.created_at.isoformat() if pr.created_at else None,
-                    'updated_at': pr.updated_at.isoformat() if pr.updated_at else None
+                    'updated_at': pr.updated_at.isoformat() if pr.updated_at else None,
+                    'is_test_target': True
+                })
+            
+            # 테스트 미대상 PR 정보 수집
+            non_target_pr_list = []
+            for pr in non_target_prs:
+                non_target_pr_list.append({
+                    'number': pr.number,
+                    'title': pr.title,
+                    'branch': pr.head.ref,
+                    'url': pr.html_url,
+                    'created_at': pr.created_at.isoformat() if pr.created_at else None,
+                    'updated_at': pr.updated_at.isoformat() if pr.updated_at else None,
+                    'is_test_target': False
                 })
             
             if all_prs:
@@ -177,7 +202,7 @@ class PollingService:
             
             self.subscription_service.update_last_polled(subscription.id)
             
-            return detected_count, detected_pr_list
+            return detected_count, detected_pr_list, non_target_pr_list
             
         except Exception as e:
             error_msg = str(e)
@@ -282,9 +307,8 @@ class PollingService:
             finally:
                 db.close()
             
-            # 구독에 저장된 기본 URL 전달 (PR URL은 pr-{번호}.{base_url} 형식으로 자동 생성)
-            base_url = subscription.base_url
-            result = self.test_pipeline.run_test_pipeline(pr, pr_diff, branch_name, base_url=base_url)
+            # preview 브랜치는 항상 preview-dev.oliveyoung.com 사용
+            result = self.test_pipeline.run_test_pipeline(pr, pr_diff, branch_name, base_url=None)
             
             db = next(get_db())
             try:
